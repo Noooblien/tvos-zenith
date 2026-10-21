@@ -30,4 +30,26 @@ class SpatialFocusEngineTest {
         val springEngine = SpatialFocusEngine(useSpringPhysics = true)
         assertTrue(springEngine.activeInterpolator is SpringPhysicsModel)
     }
+
+    @Test
+    fun testDirectional3dTiltAndSpecularPitchCalculations() {
+        val engine = SpatialFocusEngine()
+
+        // Initial or stationary focus -> 0f tilt
+        assertEquals(0f, engine.computeDirectionalTiltY(-1, 0), 0.001f)
+        assertEquals(0f, engine.computeDirectionalTiltY(2, 2), 0.001f)
+
+        // Single step right -> +3.5 deg
+        assertEquals(3.5f, engine.computeDirectionalTiltY(1, 2), 0.001f)
+
+        // Single step left -> -3.5 deg
+        assertEquals(-3.5f, engine.computeDirectionalTiltY(3, 2), 0.001f)
+
+        // Multi-step jump clamped to 2 steps -> +7.0 deg
+        assertEquals(7.0f, engine.computeDirectionalTiltY(0, 5), 0.001f)
+
+        // Specular pitch X
+        assertEquals(2.0f, engine.computeSpecularPitchX(true), 0.001f)
+        assertEquals(0.0f, engine.computeSpecularPitchX(false), 0.001f)
+    }
 }

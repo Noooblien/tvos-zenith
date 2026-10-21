@@ -14,10 +14,9 @@ import org.zenith.tvos.R
  *
  * Performance characteristics:
  * - Constant 60 FPS animation loop with strict 150ms transition budget.
- * - Hardware layer caching (View.LAYER_TYPE_HARDWARE) during D-pad navigation to prevent GPU overdraw.
+ * - Directional 3D specular card tilt (`rotationY` / `rotationX`) modeled after Apple tvOS UIKit parallax cards.
+ * - Hardware layer caching (`View.LAYER_TYPE_HARDWARE`) during D-pad navigation to prevent GPU overdraw.
  * - Zero GC allocations on D-pad navigation events.
- * - Elevation pop (0dp to 16dp) and specular border highlight.
- * - Integrated Spring Physics model modeled after Apple tvOS UIKit damped harmonic curves.
  */
 class SpatialFocusEngine(
     val focusScale: Float = DEFAULT_FOCUS_SCALE,
@@ -31,25 +30,50 @@ class SpatialFocusEngine(
         get() = if (useSpringPhysics) springModel else decelerateInterpolator
 
     /**
+     * Computes directional Y-axis 3D specular tilt angle in degrees based on horizontal D-pad step delta.
+     * Moving right (`stepDelta > 0`) banks the leading card edge (+3.5 deg); moving left banks (-3.5 deg).
+     */
+    fun computeDirectionalTiltY(previousPosition: Int, currentPosition: Int): Float {
+        if (previousPosition < 0 || currentPosition < 0 || previousPosition == currentPosition) {
+            return 0f
+        }
+        val delta = (currentPosition - previousPosition).coerceIn(-2, 2)
+        return delta * DIRECTIONAL_TILT_STEP_DEG
+    }
+
+    /**
+     * Computes subtle X-axis specular pitch when a card is focused to simulate overhead studio lighting.
+     */
+    fun computeSpecularPitchX(hasFocus: Boolean): Float {
+        return if (hasFocus) DEFAULT_SPECULAR_PITCH_X_DEG else 0f
+    }
+
+    /**
      * Binds focus animation and styling to any TV leanback item view.
      */
-    fun attach(view: View, onFocusChangeExtra: ((Boolean) -> Unit)? = null) {
+    fun attach(
+        view: View,
+        tiltAngleYProvider: (() -> Float)? = null,
+        onFocusChangeExtra: ((Boolean) -> Unit)? = null
+    ) {
         view.onFocusChangeListener = View.OnFocusChangeListener { v, hasFocus ->
             if (hasFocus) {
                 v.playSoundEffect(SoundEffectConstants.NAVIGATION_RIGHT)
             }
-            animateFocusState(v, hasFocus)
+            val tiltY = if (hasFocus) (tiltAngleYProvider?.invoke() ?: 0f) else 0f
+            animateFocusState(v, hasFocus, tiltAngleY = tiltY)
             onFocusChangeExtra?.invoke(hasFocus)
         }
     }
 
     /**
-     * Executes the hardware-accelerated tvOS pop animation.
+     * Executes the hardware-accelerated tvOS pop and 3D specular tilt animation.
      */
     fun animateFocusState(view: View, hasFocus: Boolean, tiltAngleY: Float = 0f) {
         val targetScale = if (hasFocus) focusScale else 1.0f
         val targetElevation = if (hasFocus) 16f else 0f
-        val targetTilt = if (hasFocus) tiltAngleY else 0f
+        val targetTiltY = if (hasFocus) tiltAngleY else 0f
+        val targetPitchX = computeSpecularPitchX(hasFocus)
 
         // Switch to hardware layer during animation to avoid layout re-traversals
         view.setLayerType(View.LAYER_TYPE_HARDWARE, null)
@@ -58,13 +82,26 @@ class SpatialFocusEngine(
             .scaleX(targetScale)
             .scaleY(targetScale)
             .translationZ(targetElevation)
-            .rotationY(targetTilt)
+            .rotationY(targetTiltY)
+            .rotationX(targetPitchX)
             .setDuration(animDurationMs)
             .setInterpolator(activeInterpolator)
             .setListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator) {
-                    // Revert layer type to free GPU VRAM on 1GB RAM devices
-                    view.setLayerType(View.LAYER_TYPE_NONE, null)
+                    // Gently settle Y-axis bank back to 0 while keeping focused scale & elevation
+                    if (hasFocus && targetTiltY != 0f) {
+                        view.animate()
+                            .rotationY(0f)
+                            .setDuration(110L)
+                            .setListener(object : AnimatorListenerAdapter() {
+                                override fun onAnimationEnd(animation: Animator) {
+                                    view.setLayerType(View.LAYER_TYPE_NONE, null)
+                                }
+                            })
+                            .start()
+                    } else {
+                        view.setLayerType(View.LAYER_TYPE_NONE, null)
+                    }
                 }
             })
             .start()
@@ -80,5 +117,7 @@ class SpatialFocusEngine(
     companion object {
         const val DEFAULT_FOCUS_SCALE = 1.08f
         const val DEFAULT_ANIM_DURATION = 150L
+        const val DIRECTIONAL_TILT_STEP_DEG = 3.5f
+        const val DEFAULT_SPECULAR_PITCH_X_DEG = 2.0f
     }
 }

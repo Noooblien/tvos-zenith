@@ -11,7 +11,7 @@ import org.zenith.tvos.core.focus.SpatialFocusEngine
 
 /**
  * High-performance horizontal dock and grid adapter with zero-allocation onBind,
- * tvOS long-press contextual menus, and interactive remote reordering.
+ * directional 3D specular card tilt, tvOS long-press contextual menus, and interactive remote reordering.
  */
 class AppDockAdapter(
     private val apps: MutableList<AppItem>,
@@ -26,6 +26,16 @@ class AppDockAdapter(
 
     var reorderPosition: Int = -1
         private set
+
+    private var lastFocusedPosition: Int = -1
+
+    init {
+        setHasStableIds(true)
+    }
+
+    override fun getItemId(position: Int): Long {
+        return apps[position].packageName.hashCode().toLong()
+    }
 
     fun setReorderMode(active: Boolean, position: Int = -1) {
         isReorderMode = active
@@ -58,7 +68,20 @@ class AppDockAdapter(
     override fun onBindViewHolder(holder: AppViewHolder, position: Int) {
         val item = apps[position]
         val isItemReordering = isReorderMode && position == reorderPosition
-        holder.bind(item, position, isItemReordering, onAppFocused, onAppClicked, onAppLongClicked)
+        holder.bind(
+            item = item,
+            position = position,
+            isReordering = isItemReordering,
+            tiltProvider = {
+                focusEngine.computeDirectionalTiltY(lastFocusedPosition, position)
+            },
+            onFocused = { focusedItem, pos ->
+                lastFocusedPosition = pos
+                onAppFocused(focusedItem, pos)
+            },
+            onClicked = onAppClicked,
+            onLongClicked = onAppLongClicked
+        )
     }
 
     override fun getItemCount(): Int = apps.size
@@ -75,6 +98,7 @@ class AppDockAdapter(
             item: AppItem,
             position: Int,
             isReordering: Boolean,
+            tiltProvider: () -> Float,
             onFocused: (AppItem, Int) -> Unit,
             onClicked: (AppItem) -> Unit,
             onLongClicked: ((AppItem, Int) -> Unit)?
@@ -97,7 +121,10 @@ class AppDockAdapter(
                 cardContainer.scaleY = 1.0f
             }
 
-            focusEngine.attach(cardContainer) { hasFocus ->
+            focusEngine.attach(
+                view = cardContainer,
+                tiltAngleYProvider = tiltProvider
+            ) { hasFocus ->
                 if (hasFocus) {
                     onFocused(item, position)
                     appTitle.visibility = View.VISIBLE
