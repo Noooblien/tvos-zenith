@@ -789,6 +789,21 @@ class MainActivity : Activity() {
             }
         }
 
+        // Apple TV Rubber-Band Edge Bounce when pressing D-Pad Left/Right at dock boundaries
+        if (appRecyclerView.hasFocus()) {
+            val bounceDir = dPadDebouncer.detectHorizontalBoundaryBounce(
+                keyCode = keyCode,
+                currentPosition = currentFocusedPos,
+                itemCount = displayedApps.size
+            )
+            if (bounceDir != 0) {
+                audioEngine.playBoundaryThud()
+                val focusedCard = appRecyclerView.focusedChild ?: appRecyclerView
+                focusEngine.animateBoundaryBounce(focusedCard, bounceDir)
+                return true
+            }
+        }
+
         // Open Multitasking App Switcher on APP_SWITCH key
         if (keyCode == KeyEvent.KEYCODE_APP_SWITCH) {
             audioEngine.playSelectPop()

@@ -67,8 +67,13 @@ class DPadDebounceDispatcherTest {
     }
 
     @Test
-    fun testHoldRepeatCadence() {
+    fun testHoldRepeatCadenceAndVelocityAdaptiveAcceleration() {
         val dispatcher = DPadDebounceDispatcher(repeatCadenceMs = 80L)
+
+        assertEquals(80L, dispatcher.computeAdaptiveRepeatCadenceMs(1))
+        assertEquals(62L, dispatcher.computeAdaptiveRepeatCadenceMs(4))
+        assertEquals(48L, dispatcher.computeAdaptiveRepeatCadenceMs(7))
+        assertEquals(38L, dispatcher.computeAdaptiveRepeatCadenceMs(12))
 
         // Initial press
         val initial = mockKeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_RIGHT, 100L, repeatCount = 0)
@@ -81,6 +86,21 @@ class DPadDebounceDispatcherTest {
         // Repeat event arriving at steady 80ms cadence -> dispatch
         val r2 = mockKeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_RIGHT, 185L, repeatCount = 2)
         assertTrue(dispatcher.shouldDispatchKeyEvent(r2))
+
+        // High repeatCount (repeatCount = 10 -> adaptive window 38ms): delta 42ms dispatches
+        val rFast = mockKeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_RIGHT, 227L, repeatCount = 10)
+        assertTrue(dispatcher.shouldDispatchKeyEvent(rFast))
+    }
+
+    @Test
+    fun testHorizontalBoundaryBounceDetection() {
+        val dispatcher = DPadDebounceDispatcher()
+
+        assertEquals(-1, dispatcher.detectHorizontalBoundaryBounce(KeyEvent.KEYCODE_DPAD_LEFT, 0, 6))
+        assertEquals(0, dispatcher.detectHorizontalBoundaryBounce(KeyEvent.KEYCODE_DPAD_LEFT, 2, 6))
+        assertEquals(1, dispatcher.detectHorizontalBoundaryBounce(KeyEvent.KEYCODE_DPAD_RIGHT, 5, 6))
+        assertEquals(0, dispatcher.detectHorizontalBoundaryBounce(KeyEvent.KEYCODE_DPAD_RIGHT, 2, 6))
+        assertEquals(0, dispatcher.detectHorizontalBoundaryBounce(KeyEvent.KEYCODE_DPAD_LEFT, 0, 0))
     }
 
     @Test

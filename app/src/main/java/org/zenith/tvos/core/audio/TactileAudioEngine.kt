@@ -10,7 +10,8 @@ import kotlin.math.sin
 
 /**
  * Zero-asset procedural PCM synthesizer for Apple TV style tactile sound feedback.
- * Generates ultra-crisp micro-clicks on D-pad focus shifts and warm harmonic pops on app launch,
+ * Generates ultra-crisp micro-clicks on D-pad focus shifts, warm harmonic pops on app launch,
+ * and muted low-frequency thuds on dock boundary rubber-band bounces,
  * avoiding heavy MP3/WAV asset bloat and maintaining sub-millisecond trigger latency.
  */
 class TactileAudioEngine(
@@ -37,6 +38,15 @@ class TactileAudioEngine(
         amplitude = 0.35
     )
 
+    val boundaryThudPcm: ShortArray = generateEnvelopeTone(
+        sampleRate = SAMPLE_RATE,
+        durationMs = 22,
+        startFreqHz = 190.0,
+        endFreqHz = 95.0,
+        decayRate = 180.0,
+        amplitude = 0.28
+    )
+
     fun playFocusTick() {
         if (!isEnabled) return
         audioExecutor.execute {
@@ -48,6 +58,13 @@ class TactileAudioEngine(
         if (!isEnabled) return
         audioExecutor.execute {
             playPcmBuffer(selectPopPcm)
+        }
+    }
+
+    fun playBoundaryThud() {
+        if (!isEnabled) return
+        audioExecutor.execute {
+            playPcmBuffer(boundaryThudPcm)
         }
     }
 

@@ -15,6 +15,7 @@ import org.zenith.tvos.R
  * Performance characteristics:
  * - Constant 60 FPS animation loop with strict 150ms transition budget.
  * - Directional 3D specular card tilt (`rotationY` / `rotationX`) modeled after Apple tvOS UIKit parallax cards.
+ * - Boundary rubber-band spring recoil when hitting the start or end of a horizontal dock row.
  * - Hardware layer caching (`View.LAYER_TYPE_HARDWARE`) during D-pad navigation to prevent GPU overdraw.
  * - Zero GC allocations on D-pad navigation events.
  */
@@ -46,6 +47,46 @@ class SpatialFocusEngine(
      */
     fun computeSpecularPitchX(hasFocus: Boolean): Float {
         return if (hasFocus) DEFAULT_SPECULAR_PITCH_X_DEG else 0f
+    }
+
+    /**
+     * Computes the horizontal rubber-band displacement in pixels when the user presses D-pad Left/Right
+     * at the boundary of a dock row (`directionSign`: -1 for left edge, +1 for right edge).
+     */
+    fun computeBoundaryBounceOffsetPx(directionSign: Int, density: Float = 1.0f): Float {
+        val clampedSign = directionSign.coerceIn(-1, 1)
+        return clampedSign * DEFAULT_BOUNDARY_BOUNCE_DP * density.coerceAtLeast(0.5f)
+    }
+
+    /**
+     * Executes a hardware-accelerated Apple TV rubber-band edge recoil animation on [view]
+     * when the user hits the first or last item of the horizontal dock.
+     */
+    fun animateBoundaryBounce(view: View, directionSign: Int) {
+        if (directionSign == 0) return
+        val density = view.resources.displayMetrics.density
+        val offsetPx = computeBoundaryBounceOffsetPx(directionSign, density)
+
+        view.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+        view.animate()
+            .translationX(offsetPx)
+            .setDuration(75L)
+            .setInterpolator(decelerateInterpolator)
+            .setListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    view.animate()
+                        .translationX(0f)
+                        .setDuration(140L)
+                        .setInterpolator(activeInterpolator)
+                        .setListener(object : AnimatorListenerAdapter() {
+                            override fun onAnimationEnd(animation: Animator) {
+                                view.setLayerType(View.LAYER_TYPE_NONE, null)
+                            }
+                        })
+                        .start()
+                }
+            })
+            .start()
     }
 
     /**
@@ -119,5 +160,6 @@ class SpatialFocusEngine(
         const val DEFAULT_ANIM_DURATION = 150L
         const val DIRECTIONAL_TILT_STEP_DEG = 3.5f
         const val DEFAULT_SPECULAR_PITCH_X_DEG = 2.0f
+        const val DEFAULT_BOUNDARY_BOUNCE_DP = 14f
     }
 }

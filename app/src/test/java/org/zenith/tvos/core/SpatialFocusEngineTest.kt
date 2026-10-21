@@ -52,4 +52,12 @@ class SpatialFocusEngineTest {
         assertEquals(2.0f, engine.computeSpecularPitchX(true), 0.001f)
         assertEquals(0.0f, engine.computeSpecularPitchX(false), 0.001f)
     }
+
+    @Test
+    fun testBoundaryBounceOffsetComputation() {
+        val engine = SpatialFocusEngine()
+        assertEquals(-28.0f, engine.computeBoundaryBounceOffsetPx(-1, density = 2.0f), 0.001f)
+        assertEquals(28.0f, engine.computeBoundaryBounceOffsetPx(1, density = 2.0f), 0.001f)
+        assertEquals(0.0f, engine.computeBoundaryBounceOffsetPx(0, density = 2.0f), 0.001f)
+    }
 }

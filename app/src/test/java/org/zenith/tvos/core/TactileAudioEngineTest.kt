@@ -10,7 +10,7 @@ import kotlin.math.abs
 class TactileAudioEngineTest {
 
     @Test
-    fun `synthesized focusTickPcm and selectPopPcm have expected sample lengths and non-zero peaks`() {
+    fun `synthesized focusTickPcm, selectPopPcm, and boundaryThudPcm have expected sample lengths and non-zero peaks`() {
         val engine = TactileAudioEngine(isEnabled = true)
 
         // 14ms at 22050 Hz = 308 samples
@@ -20,6 +20,10 @@ class TactileAudioEngineTest {
         // 28ms at 22050 Hz = 617 samples
         assertEquals(617, engine.selectPopPcm.size)
         assertTrue(engine.selectPopPcm.any { abs(it.toInt()) > 1000 })
+
+        // 22ms at 22050 Hz = 485 samples
+        assertEquals(485, engine.boundaryThudPcm.size)
+        assertTrue(engine.boundaryThudPcm.any { abs(it.toInt()) > 500 })
     }
 
     @Test
@@ -43,6 +47,7 @@ class TactileAudioEngineTest {
         assertFalse(engine.isEnabled)
         engine.playFocusTick()
         engine.playSelectPop()
+        engine.playBoundaryThud()
         engine.isEnabled = true
         assertTrue(engine.isEnabled)
     }
