@@ -24,6 +24,7 @@ import org.zenith.tvos.core.focus.SpatialFocusEngine
 import org.zenith.tvos.core.input.DPadDebounceDispatcher
 import org.zenith.tvos.core.parallax.ParallaxBackdropEngine
 import org.zenith.tvos.core.performance.FramePacer
+import org.zenith.tvos.core.recommendation.OfflineTopShelfContentEngine
 import org.zenith.tvos.core.security.IntentSanitizer
 import org.zenith.tvos.core.security.PackageChangeReceiver
 import org.zenith.tvos.core.wallpaper.DynamicWallpaperEngine
@@ -40,7 +41,7 @@ import org.zenith.tvos.ui.topshelf.TopShelfHeroView
  * - < 120ms cold boot
  * - Zero background analytics or ad SDKs
  * - Strict 18MB PSS RAM ceiling
- * - Solid 60 FPS D-pad navigation with Spring Physics, Parallax, Procedural Wallpapers & D-Pad Debouncing
+ * - Solid 60 FPS D-pad navigation with Spring Physics, Parallax, Procedural Wallpapers, D-Pad Debouncing & Offline Top Shelf Engine
  */
 class MainActivity : Activity() {
 
@@ -49,6 +50,7 @@ class MainActivity : Activity() {
     private val focusEngine = SpatialFocusEngine(useSpringPhysics = true)
     private val parallaxEngine = ParallaxBackdropEngine()
     private val wallpaperEngine = DynamicWallpaperEngine()
+    private val topShelfEngine = OfflineTopShelfContentEngine()
     private val dPadDebouncer = DPadDebounceDispatcher()
     private val framePacer = FramePacer()
 
@@ -127,11 +129,10 @@ class MainActivity : Activity() {
                 focusEngine = focusEngine,
                 onAppFocused = { item, position ->
                     focusedAppName.text = item.label
-                    topShelfHero.updateHero(
-                        title = item.label,
-                        subtitle = "Launch ${item.label} in ultra-high performance mode.",
-                        meta = "${item.category.displayName.uppercase()} • READY"
-                    )
+
+                    // Offline contextual Top Shelf content resolution
+                    val heroContent = topShelfEngine.resolveContent(item)
+                    topShelfHero.updateHero(heroContent)
 
                     // Apple TV Dynamic 2.5D Parallax Shift
                     val ratio = parallaxEngine.computeNormalizedRatio(position, appList.size)
@@ -151,11 +152,8 @@ class MainActivity : Activity() {
             if (appList.isNotEmpty()) {
                 val first = appList[0]
                 focusedAppName.text = first.label
-                topShelfHero.updateHero(
-                    title = first.label,
-                    subtitle = "Launch ${first.label} in ultra-high performance mode.",
-                    meta = "${first.category.displayName.uppercase()} • READY"
-                )
+                val heroContent = topShelfEngine.resolveContent(first)
+                topShelfHero.updateHero(heroContent)
             }
         }
     }

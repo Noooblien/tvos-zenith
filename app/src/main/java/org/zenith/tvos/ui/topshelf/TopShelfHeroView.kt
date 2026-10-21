@@ -9,6 +9,7 @@ import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
+import org.zenith.tvos.core.recommendation.OfflineTopShelfContentEngine
 
 /**
  * Apple TV Top Shelf dynamic hero container.
@@ -25,6 +26,8 @@ class TopShelfHeroView @JvmOverloads constructor(
     private val metaBadgeView: TextView
     private val synopsisView: TextView
     private val actionContainer: LinearLayout
+    private val primaryActionBtn: Button
+    private val secondaryActionBtn: Button
 
     init {
         // Deep obsidian background with rounded container
@@ -69,7 +72,7 @@ class TopShelfHeroView @JvmOverloads constructor(
             setPadding(0, 20, 0, 0)
         }
 
-        val playBtn = Button(context).apply {
+        primaryActionBtn = Button(context).apply {
             text = "▶ Play"
             setBackgroundColor(Color.WHITE)
             setTextColor(Color.BLACK)
@@ -77,7 +80,7 @@ class TopShelfHeroView @JvmOverloads constructor(
             isFocusable = true
         }
 
-        val detailsBtn = Button(context).apply {
+        secondaryActionBtn = Button(context).apply {
             text = "Details"
             setBackgroundColor(Color.parseColor("#33FFFFFF"))
             setTextColor(Color.WHITE)
@@ -85,8 +88,8 @@ class TopShelfHeroView @JvmOverloads constructor(
             isFocusable = true
         }
 
-        actionContainer.addView(playBtn)
-        actionContainer.addView(detailsBtn)
+        actionContainer.addView(primaryActionBtn)
+        actionContainer.addView(secondaryActionBtn)
 
         contentLayout.addView(metaBadgeView)
         contentLayout.addView(titleView)
@@ -102,13 +105,34 @@ class TopShelfHeroView @JvmOverloads constructor(
     /**
      * Dynamically updates the Top Shelf content when the user hovers over an app card.
      */
-    fun updateHero(title: String, subtitle: String, meta: String) {
+    fun updateHero(
+        title: String,
+        subtitle: String,
+        meta: String,
+        primaryAction: String = "▶ Play",
+        secondaryAction: String = "Details"
+    ) {
         animate().alpha(0.4f).setDuration(80L).withEndAction {
             titleView.text = title
             synopsisView.text = subtitle
             metaBadgeView.text = meta
+            primaryActionBtn.text = primaryAction
+            secondaryActionBtn.text = secondaryAction
             animate().alpha(1.0f).setDuration(120L).start()
         }.start()
+    }
+
+    /**
+     * Updates hero using structured content from OfflineTopShelfContentEngine.
+     */
+    fun updateHero(content: OfflineTopShelfContentEngine.HeroContent) {
+        updateHero(
+            title = content.title,
+            subtitle = content.subtitle,
+            meta = content.badgeMeta,
+            primaryAction = content.primaryActionLabel,
+            secondaryAction = content.secondaryActionLabel
+        )
     }
 
     /**
