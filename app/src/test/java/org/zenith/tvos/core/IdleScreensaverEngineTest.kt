@@ -5,6 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.zenith.tvos.core.screensaver.IdleScreensaverEngine
+import kotlin.math.abs
 
 class IdleScreensaverEngineTest {
 
@@ -68,5 +69,37 @@ class IdleScreensaverEngineTest {
         engine.dismiss()
         assertFalse(engine.isScreensaverActive)
         assertEquals(25_000L, engine.lastInteractionTimestampMs)
+    }
+
+    @Test
+    fun `resolveVista and stepVistaIndex wrap around cleanly for D-pad scrubbing`() {
+        val engine = IdleScreensaverEngine()
+        assertEquals(5, engine.vistas.size)
+
+        val first = engine.resolveVista(0)
+        assertEquals("Patagonia Glaciers  •  Southern Andes, Chile", first.formatCaptionLine())
+        assertTrue(first.formatTelemetryLine().contains("50.9423° S"))
+
+        // Scrubbing left from index 0 wraps to last vista (index 4)
+        val wrappedLeftIdx = engine.stepVistaIndex(0, -1)
+        assertEquals(4, wrappedLeftIdx)
+        assertEquals("Blue Coral Atoll", engine.resolveVista(wrappedLeftIdx).title)
+
+        // Scrubbing right from index 4 wraps to index 0
+        assertEquals(0, engine.stepVistaIndex(4, 1))
+    }
+
+    @Test
+    fun `computeOledLissajousShift stays bounded and varies non-repetitively across steps`() {
+        val engine = IdleScreensaverEngine()
+        val s0 = engine.computeOledLissajousShift(stepIndex = 0, density = 2.0f)
+        assertEquals(0f, s0.shiftXPx, 0.001f)
+        assertEquals(32.0f, s0.shiftYPx, 0.001f)
+
+        val s1 = engine.computeOledLissajousShift(stepIndex = 1, density = 2.0f)
+        assertTrue(abs(s1.shiftXPx) <= 44.01f)
+        assertTrue(abs(s1.shiftYPx) <= 32.01f)
+        assertTrue(s1.shiftXPx > 0f)
+        assertTrue(s1.shiftYPx < s0.shiftYPx)
     }
 }
