@@ -21,6 +21,7 @@ import kotlinx.coroutines.withContext
 import org.zenith.tvos.R
 import org.zenith.tvos.core.cache.UltraLightIconCache
 import org.zenith.tvos.core.focus.SpatialFocusEngine
+import org.zenith.tvos.core.input.DPadDebounceDispatcher
 import org.zenith.tvos.core.parallax.ParallaxBackdropEngine
 import org.zenith.tvos.core.performance.FramePacer
 import org.zenith.tvos.core.security.IntentSanitizer
@@ -39,7 +40,7 @@ import org.zenith.tvos.ui.topshelf.TopShelfHeroView
  * - < 120ms cold boot
  * - Zero background analytics or ad SDKs
  * - Strict 18MB PSS RAM ceiling
- * - Solid 60 FPS D-pad navigation with Spring Physics, Parallax, and Procedural Wallpapers
+ * - Solid 60 FPS D-pad navigation with Spring Physics, Parallax, Procedural Wallpapers & D-Pad Debouncing
  */
 class MainActivity : Activity() {
 
@@ -48,6 +49,7 @@ class MainActivity : Activity() {
     private val focusEngine = SpatialFocusEngine(useSpringPhysics = true)
     private val parallaxEngine = ParallaxBackdropEngine()
     private val wallpaperEngine = DynamicWallpaperEngine()
+    private val dPadDebouncer = DPadDebounceDispatcher()
     private val framePacer = FramePacer()
 
     private lateinit var rootContainer: View
@@ -83,6 +85,7 @@ class MainActivity : Activity() {
     override fun onPause() {
         super.onPause()
         framePacer.stop()
+        dPadDebouncer.reset()
     }
 
     override fun onDestroy() {
@@ -94,6 +97,14 @@ class MainActivity : Activity() {
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
         iconCache.onTrimMemory(level)
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        // Drop noisy jitter or flooding D-pad repeat events on low-spec chips
+        if (!dPadDebouncer.shouldDispatchKeyEvent(event)) {
+            return true
+        }
+        return super.dispatchKeyEvent(event)
     }
 
     private fun setupRecyclerView() {
