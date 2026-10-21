@@ -20,6 +20,26 @@
         android:layout_marginTop="20dp"
         android:clipChildren="false" />
 
+    <!-- Live 60FPS & Memory Telemetry Pill Badge (Top Left, hidden by default) -->
+    <TextView
+        android:id="@+id/tvTelemetryHud"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentLeft="true"
+        android:layout_marginTop="32dp"
+        android:layout_marginStart="68dp"
+        android:layout_marginLeft="68dp"
+        android:background="@drawable/bg_category_pill"
+        android:fontFamily="monospace"
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="5dp"
+        android:text="⚡ 60 FPS • 🧠 Heap: 6.2 MB"
+        android:textColor="#30D158"
+        android:textSize="11sp"
+        android:visibility="gone" />
+
     <!-- Top-Right Utility Controls (Spotlight Search, Phone Remote & Zenith Settings) -->
     <LinearLayout
         android:id="@+id/topUtilityBar"

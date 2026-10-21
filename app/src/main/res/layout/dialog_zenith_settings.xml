@@ -1,34 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="440dp"
+    android:layout_width="460dp"
     android:layout_height="wrap_content"
     android:layout_gravity="center"
     android:background="@drawable/bg_context_menu"
     android:orientation="vertical"
-    android:padding="28dp">
+    android:padding="26dp">
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="⚙️ Zenith TV Preferences"
         android:textColor="@color/tvos_text_primary"
-        android:textSize="22sp"
+        android:textSize="21sp"
         android:textStyle="bold" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
-        android:layout_marginBottom="20dp"
-        android:text="Customize visual themes, tactile audio, and ambient display"
+        android:layout_marginBottom="16dp"
+        android:text="Customize visual themes, tactile audio, HUD telemetry, and memory"
         android:textColor="@color/tvos_text_secondary"
-        android:textSize="13sp" />
+        android:textSize="12.5sp" />
 
     <Button
         android:id="@+id/btnSettingWallpaper"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:layout_marginBottom="10dp"
+        android:layout_height="44dp"
+        android:layout_marginBottom="8dp"
         android:background="@drawable/bg_menu_item"
         android:focusable="true"
         android:gravity="start|center_vertical"
@@ -36,13 +36,13 @@
         android:text="🎨 Wallpaper: Dynamic per Category"
         android:textAllCaps="false"
         android:textColor="@color/tvos_text_primary"
-        android:textSize="14.5sp" />
+        android:textSize="14sp" />
 
     <Button
         android:id="@+id/btnSettingSound"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:layout_marginBottom="10dp"
+        android:layout_height="44dp"
+        android:layout_marginBottom="8dp"
         android:background="@drawable/bg_menu_item"
         android:focusable="true"
         android:gravity="start|center_vertical"
@@ -50,13 +50,41 @@
         android:text="🔊 Tactile Audio Clicks: ON"
         android:textAllCaps="false"
         android:textColor="@color/tvos_text_primary"
-        android:textSize="14.5sp" />
+        android:textSize="14sp" />
+
+    <Button
+        android:id="@+id/btnSettingHud"
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:layout_marginBottom="8dp"
+        android:background="@drawable/bg_menu_item"
+        android:focusable="true"
+        android:gravity="start|center_vertical"
+        android:paddingHorizontal="16dp"
+        android:text="📊 60FPS &amp; RAM Telemetry HUD: OFF"
+        android:textAllCaps="false"
+        android:textColor="@color/tvos_text_primary"
+        android:textSize="14sp" />
+
+    <Button
+        android:id="@+id/btnSmartRamBoost"
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:layout_marginBottom="8dp"
+        android:background="@drawable/bg_menu_item"
+        android:focusable="true"
+        android:gravity="start|center_vertical"
+        android:paddingHorizontal="16dp"
+        android:text="⚡ Smart RAM Boost (Trim Cache &amp; Free Memory)"
+        android:textAllCaps="false"
+        android:textColor="@color/tvos_text_primary"
+        android:textSize="14sp" />
 
     <Button
         android:id="@+id/btnSettingScreensaver"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:layout_marginBottom="10dp"
+        android:layout_height="44dp"
+        android:layout_marginBottom="8dp"
         android:background="@drawable/bg_menu_item"
         android:focusable="true"
         android:gravity="start|center_vertical"
@@ -64,13 +92,13 @@
         android:text="🌙 Ambient Screensaver: 2 Minutes"
         android:textAllCaps="false"
         android:textColor="@color/tvos_text_primary"
-        android:textSize="14.5sp" />
+        android:textSize="14sp" />
 
     <Button
         android:id="@+id/btnPreviewScreensaver"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:layout_marginBottom="10dp"
+        android:layout_height="44dp"
+        android:layout_marginBottom="8dp"
         android:background="@drawable/bg_menu_item"
         android:focusable="true"
         android:gravity="start|center_vertical"
@@ -78,13 +106,13 @@
         android:text="✨ Start Aerial Screensaver Now"
         android:textAllCaps="false"
         android:textColor="@color/tvos_text_primary"
-        android:textSize="14.5sp" />
+        android:textSize="14sp" />
 
     <Button
         android:id="@+id/btnUnhideAll"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:layout_marginBottom="16dp"
+        android:layout_height="44dp"
+        android:layout_marginBottom="14dp"
         android:background="@drawable/bg_menu_item"
         android:focusable="true"
         android:gravity="start|center_vertical"
@@ -92,12 +120,12 @@
         android:text="👁️ Restore Hidden Apps (0)"
         android:textAllCaps="false"
         android:textColor="@color/tvos_text_primary"
-        android:textSize="14.5sp" />
+        android:textSize="14sp" />
 
     <Button
         android:id="@+id/btnCloseSettings"
         android:layout_width="match_parent"
-        android:layout_height="44dp"
+        android:layout_height="42dp"
         android:background="@drawable/bg_pill_button_primary"
         android:focusable="true"
         android:text="Done"

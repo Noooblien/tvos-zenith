@@ -24,6 +24,8 @@ interface SettingsStorage {
     fun setSoundEnabled(enabled: Boolean)
     fun getScreensaverTimeoutSec(): Int
     fun setScreensaverTimeoutSec(seconds: Int)
+    fun isHudOverlayEnabled(): Boolean
+    fun setHudOverlayEnabled(enabled: Boolean)
 }
 
 /**
@@ -61,11 +63,20 @@ class SharedPreferencesSettingsStorage(context: Context) : SettingsStorage {
         prefs.edit().putInt(KEY_SCREENSAVER_TIMEOUT, seconds).apply()
     }
 
+    override fun isHudOverlayEnabled(): Boolean {
+        return prefs.getBoolean(KEY_HUD_OVERLAY_ENABLED, false)
+    }
+
+    override fun setHudOverlayEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_HUD_OVERLAY_ENABLED, enabled).apply()
+    }
+
     companion object {
         private const val PREFS_NAME = "zenith_tv_settings_prefs"
         private const val KEY_WALLPAPER_MODE = "wallpaper_mode"
         private const val KEY_SOUND_ENABLED = "tactile_sound_enabled"
         private const val KEY_SCREENSAVER_TIMEOUT = "screensaver_timeout_sec"
+        private const val KEY_HUD_OVERLAY_ENABLED = "hud_overlay_enabled"
     }
 }
 
@@ -89,6 +100,10 @@ class ZenithSettingsManager(
         get() = storage.getScreensaverTimeoutSec()
         set(value) = storage.setScreensaverTimeoutSec(value)
 
+    var isHudOverlayEnabled: Boolean
+        get() = storage.isHudOverlayEnabled()
+        set(value) = storage.setHudOverlayEnabled(value)
+
     fun cycleWallpaperMode(): WallpaperMode {
         val values = WallpaperMode.values()
         val nextIndex = (wallpaperMode.ordinal + 1) % values.size
@@ -100,6 +115,12 @@ class ZenithSettingsManager(
     fun toggleSound(): Boolean {
         val next = !isSoundEnabled
         isSoundEnabled = next
+        return next
+    }
+
+    fun toggleHudOverlay(): Boolean {
+        val next = !isHudOverlayEnabled
+        isHudOverlayEnabled = next
         return next
     }
 

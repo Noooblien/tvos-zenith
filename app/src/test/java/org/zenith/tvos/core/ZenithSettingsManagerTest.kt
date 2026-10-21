@@ -14,6 +14,7 @@ class ZenithSettingsManagerTest {
         private var mode: WallpaperMode = WallpaperMode.DYNAMIC_CATEGORY
         private var sound: Boolean = true
         private var timeoutSec: Int = 120
+        private var hud: Boolean = false
 
         override fun getWallpaperMode(): WallpaperMode = mode
         override fun setWallpaperMode(mode: WallpaperMode) { this.mode = mode }
@@ -21,6 +22,8 @@ class ZenithSettingsManagerTest {
         override fun setSoundEnabled(enabled: Boolean) { this.sound = enabled }
         override fun getScreensaverTimeoutSec(): Int = timeoutSec
         override fun setScreensaverTimeoutSec(seconds: Int) { this.timeoutSec = seconds }
+        override fun isHudOverlayEnabled(): Boolean = hud
+        override fun setHudOverlayEnabled(enabled: Boolean) { this.hud = enabled }
     }
 
     @Test
@@ -36,15 +39,18 @@ class ZenithSettingsManagerTest {
     }
 
     @Test
-    fun `toggles tactile sound state accurately`() {
+    fun `toggles tactile sound and HUD overlay state accurately`() {
         val manager = ZenithSettingsManager(InMemorySettingsStorage())
         assertTrue(manager.isSoundEnabled)
+        assertFalse(manager.isHudOverlayEnabled)
 
         assertFalse(manager.toggleSound())
         assertFalse(manager.isSoundEnabled)
-
         assertTrue(manager.toggleSound())
-        assertTrue(manager.isSoundEnabled)
+
+        assertTrue(manager.toggleHudOverlay())
+        assertTrue(manager.isHudOverlayEnabled)
+        assertFalse(manager.toggleHudOverlay())
     }
 
     @Test

@@ -14,7 +14,9 @@ import org.zenith.tvos.core.library.AppLibraryManager
 import org.zenith.tvos.core.settings.ZenithSettingsManager
 
 /**
- * Glassmorphic customization modal for Zenith TV preferences.
+ * Glassmorphic Settings & Customization Modal for Zenith TV.
+ * Allows D-pad cycling of Wallpaper themes, Tactile Sound feedback, 60FPS Telemetry HUD,
+ * Smart RAM Boost, Ambient Screensaver timeouts, and restoring hidden applications.
  */
 class ZenithSettingsDialog(
     context: Context,
@@ -22,17 +24,21 @@ class ZenithSettingsDialog(
     private val libraryManager: AppLibraryManager,
     private val audioEngine: TactileAudioEngine,
     private val onSettingsChanged: () -> Unit,
+    private val onSmartRamBoost: () -> Unit,
     private val onStartScreensaverNow: () -> Unit
 ) : Dialog(context) {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         requestWindowFeature(Window.FEATURE_NO_TITLE)
-        window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
         setContentView(R.layout.dialog_zenith_settings)
+
+        window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
 
         val btnWallpaper = findViewById<Button>(R.id.btnSettingWallpaper)
         val btnSound = findViewById<Button>(R.id.btnSettingSound)
+        val btnHud = findViewById<Button>(R.id.btnSettingHud)
+        val btnRamBoost = findViewById<Button>(R.id.btnSmartRamBoost)
         val btnScreensaver = findViewById<Button>(R.id.btnSettingScreensaver)
         val btnPreviewScreensaver = findViewById<Button>(R.id.btnPreviewScreensaver)
         val btnUnhideAll = findViewById<Button>(R.id.btnUnhideAll)
@@ -41,13 +47,22 @@ class ZenithSettingsDialog(
         fun refreshLabels() {
             btnWallpaper.text = "🎨 Wallpaper: ${settingsManager.wallpaperMode.displayName}"
             btnSound.text = "🔊 Tactile Audio Clicks: ${if (settingsManager.isSoundEnabled) "ON" else "OFF"}"
+            btnHud.text = "📊 60FPS & RAM Telemetry HUD: ${if (settingsManager.isHudOverlayEnabled) "ON" else "OFF"}"
             btnScreensaver.text = "🌙 Ambient Screensaver: ${settingsManager.formatScreensaverTimeout()}"
             btnUnhideAll.text = "👁️ Restore Hidden Apps (${libraryManager.getHiddenCount()})"
         }
 
         refreshLabels()
 
-        val menuButtons = listOf(btnWallpaper, btnSound, btnScreensaver, btnPreviewScreensaver, btnUnhideAll)
+        val menuButtons = listOf(
+            btnWallpaper,
+            btnSound,
+            btnHud,
+            btnRamBoost,
+            btnScreensaver,
+            btnPreviewScreensaver,
+            btnUnhideAll
+        )
         for (btn in menuButtons) {
             btn.setOnFocusChangeListener { view, hasFocus ->
                 val b = view as Button
@@ -73,6 +88,18 @@ class ZenithSettingsDialog(
             if (enabled) audioEngine.playSelectPop()
             refreshLabels()
             onSettingsChanged()
+        }
+
+        btnHud.setOnClickListener {
+            settingsManager.toggleHudOverlay()
+            audioEngine.playSelectPop()
+            refreshLabels()
+            onSettingsChanged()
+        }
+
+        btnRamBoost.setOnClickListener {
+            audioEngine.playSelectPop()
+            onSmartRamBoost()
         }
 
         btnScreensaver.setOnClickListener {

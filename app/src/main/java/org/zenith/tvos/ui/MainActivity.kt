@@ -31,6 +31,7 @@ import org.zenith.tvos.core.library.SharedPreferencesAppStorage
 import org.zenith.tvos.core.menu.AppContextMenuEngine
 import org.zenith.tvos.core.parallax.ParallaxBackdropEngine
 import org.zenith.tvos.core.performance.FramePacer
+import org.zenith.tvos.core.performance.SystemHealthEngine
 import org.zenith.tvos.core.recommendation.OfflineTopShelfContentEngine
 import org.zenith.tvos.core.remote.ZenithRemoteServer
 import org.zenith.tvos.core.screensaver.IdleScreensaverEngine
@@ -61,7 +62,7 @@ import org.zenith.tvos.ui.topshelf.TopShelfHeroView
  * - Zero-install local Wi-Fi Phone Remote Web Server & Companion App Support
  * - Procedural PCM 16-bit Tactile Audio Engine (zero asset bloat)
  * - Apple TV Aerial Ambient Screensaver with OLED pixel-shift protection
- * - Glassmorphic Zenith Settings & Spotlight Fuzzy Quick-Search Modal
+ * - Glassmorphic Zenith Settings, 60FPS Telemetry HUD & Smart RAM Boost
  */
 class MainActivity : Activity() {
 
@@ -73,6 +74,7 @@ class MainActivity : Activity() {
     private val topShelfEngine = OfflineTopShelfContentEngine()
     private val dPadDebouncer = DPadDebounceDispatcher()
     private val framePacer = FramePacer()
+    private val healthEngine = SystemHealthEngine(framePacer, iconCache)
     private val menuEngine = AppContextMenuEngine()
     private val remoteServer = ZenithRemoteServer(port = 8080)
     private val audioEngine = TactileAudioEngine()
@@ -84,6 +86,7 @@ class MainActivity : Activity() {
     private lateinit var settingsManager: ZenithSettingsManager
     private lateinit var rootContainer: View
     private lateinit var topShelfHero: TopShelfHeroView
+    private lateinit var tvTelemetryHud: TextView
     private lateinit var btnSpotlightSearch: Button
     private lateinit var btnPhoneRemote: Button
     private lateinit var btnZenithSettings: Button
@@ -123,6 +126,16 @@ class MainActivity : Activity() {
         }
     }
 
+    private val hudTickerRunnable = object : Runnable {
+        override fun run() {
+            if (settingsManager.isHudOverlayEnabled) {
+                val snap = healthEngine.captureSnapshot()
+                tvTelemetryHud.text = snap.formatHudLine()
+                mainHandler.postDelayed(this, 1_000L)
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -132,6 +145,7 @@ class MainActivity : Activity() {
 
         rootContainer = findViewById(R.id.rootContainer)
         topShelfHero = findViewById(R.id.topShelfHero)
+        tvTelemetryHud = findViewById(R.id.tvTelemetryHud)
         btnSpotlightSearch = findViewById(R.id.btnSpotlightSearch)
         btnPhoneRemote = findViewById(R.id.btnPhoneRemote)
         btnZenithSettings = findViewById(R.id.btnZenithSettings)
@@ -153,6 +167,16 @@ class MainActivity : Activity() {
         audioEngine.isEnabled = settingsManager.isSoundEnabled
         screensaverEngine.timeoutMs = settingsManager.screensaverTimeoutSec * 1000L
         applyCurrentWallpaper(currentFocusedApp?.category)
+
+        if (settingsManager.isHudOverlayEnabled) {
+            tvTelemetryHud.visibility = View.VISIBLE
+            tvTelemetryHud.text = healthEngine.captureSnapshot().formatHudLine()
+            mainHandler.removeCallbacks(hudTickerRunnable)
+            mainHandler.postDelayed(hudTickerRunnable, 1_000L)
+        } else {
+            tvTelemetryHud.visibility = View.GONE
+            mainHandler.removeCallbacks(hudTickerRunnable)
+        }
     }
 
     private fun applyCurrentWallpaper(category: AppCategory?) {
@@ -233,6 +257,12 @@ class MainActivity : Activity() {
             onSettingsChanged = {
                 syncSettingsState()
                 updateDisplayedApps()
+            },
+            onSmartRamBoost = {
+                val reclaimedBytes = healthEngine.performSmartRamBoost()
+                val reclaimedKb = (reclaimedBytes / 1024L).coerceAtLeast(128L)
+                syncSettingsState()
+                Toast.makeText(this, "⚡ Smart RAM Boost complete (~${reclaimedKb} KB freed)", Toast.LENGTH_SHORT).show()
             },
             onStartScreensaverNow = {
                 screensaverEngine.activateNow()
@@ -401,6 +431,10 @@ class MainActivity : Activity() {
         screensaverEngine.recordInteraction()
         mainHandler.removeCallbacks(idleWatcherRunnable)
         mainHandler.postDelayed(idleWatcherRunnable, 5_000L)
+        if (settingsManager.isHudOverlayEnabled) {
+            mainHandler.removeCallbacks(hudTickerRunnable)
+            mainHandler.postDelayed(hudTickerRunnable, 1_000L)
+        }
     }
 
     override fun onPause() {
@@ -408,11 +442,13 @@ class MainActivity : Activity() {
         framePacer.stop()
         dPadDebouncer.reset()
         mainHandler.removeCallbacks(idleWatcherRunnable)
+        mainHandler.removeCallbacks(hudTickerRunnable)
     }
 
     override fun onDestroy() {
         super.onDestroy()
         mainHandler.removeCallbacks(idleWatcherRunnable)
+        mainHandler.removeCallbacks(hudTickerRunnable)
         remoteServer.stop()
         packageReceiver?.let { unregisterReceiver(it) }
         iconCache.evictAll()
