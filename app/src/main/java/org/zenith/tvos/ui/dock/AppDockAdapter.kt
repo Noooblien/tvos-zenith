@@ -5,14 +5,16 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import org.zenith.tvos.R
 import org.zenith.tvos.core.focus.SpatialFocusEngine
 
 /**
  * High-performance horizontal dock and grid adapter with zero-allocation onBind,
- * directional 3D specular card tilt, Parental PIN lock badge, tvOS long-press contextual menus,
- * and interactive remote reordering.
+ * DiffUtil incremental list updates, directional 3D specular card tilt, multi-layer
+ * inner icon/sheen parallax, tactile click compression, Parental PIN lock badge,
+ * tvOS long-press contextual menus, and interactive remote reordering.
  */
 class AppDockAdapter(
     private val apps: MutableList<AppItem>,
@@ -57,9 +59,11 @@ class AppDockAdapter(
     }
 
     fun updateList(newApps: List<AppItem>) {
+        val oldSnapshot = apps.toList()
+        val diffResult = DiffUtil.calculateDiff(AppItemDiffCallback(oldSnapshot, newApps))
         apps.clear()
         apps.addAll(newApps)
-        notifyDataSetChanged()
+        diffResult.dispatchUpdatesTo(this)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): AppViewHolder {
@@ -77,7 +81,7 @@ class AppDockAdapter(
             isReordering = isItemReordering,
             isLocked = isLocked,
             tiltProvider = {
-                focusEngine.computeDirectionalTiltY(lastFocusedPosition, position)
+                focusEngine.computeDirectionalTiltY(lastFocusedPosition, holder.bindingAdapterPosition.takeIf { it >= 0 } ?: position)
             },
             onFocused = { focusedItem, pos ->
                 lastFocusedPosition = pos
@@ -90,11 +94,32 @@ class AppDockAdapter(
 
     override fun getItemCount(): Int = apps.size
 
+    class AppItemDiffCallback(
+        private val oldList: List<AppItem>,
+        private val newList: List<AppItem>
+    ) : DiffUtil.Callback() {
+        override fun getOldListSize(): Int = oldList.size
+        override fun getNewListSize(): Int = newList.size
+
+        override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+            return oldList[oldItemPosition].packageName == newList[newItemPosition].packageName
+        }
+
+        override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+            val oldItem = oldList[oldItemPosition]
+            val newItem = newList[newItemPosition]
+            return oldItem.packageName == newItem.packageName &&
+                oldItem.label == newItem.label &&
+                oldItem.category == newItem.category
+        }
+    }
+
     class AppViewHolder(
         itemView: View,
         private val focusEngine: SpatialFocusEngine
     ) : RecyclerView.ViewHolder(itemView) {
         private val cardContainer: View = itemView.findViewById(R.id.cardContainer)
+        private val specularSheen: View? = itemView.findViewById(R.id.specularSheen)
         private val appIcon: ImageView = itemView.findViewById(R.id.appIcon)
         private val lockBadge: TextView = itemView.findViewById(R.id.lockBadge)
         private val appTitle: TextView = itemView.findViewById(R.id.appTitle)
@@ -132,8 +157,16 @@ class AppDockAdapter(
                 view = cardContainer,
                 tiltAngleYProvider = tiltProvider
             ) { hasFocus ->
+                val resolvedPos = bindingAdapterPosition.takeIf { it >= 0 } ?: position
+                val tiltY = if (hasFocus) tiltProvider() else 0f
+                focusEngine.animateCardInnerLayers(
+                    iconView = appIcon,
+                    sheenView = specularSheen,
+                    hasFocus = hasFocus,
+                    tiltAngleY = tiltY
+                )
                 if (hasFocus) {
-                    onFocused(item, position)
+                    onFocused(item, resolvedPos)
                     appTitle.visibility = View.VISIBLE
                 } else {
                     appTitle.visibility = View.GONE
@@ -141,11 +174,14 @@ class AppDockAdapter(
             }
 
             cardContainer.setOnClickListener {
-                onClicked(item)
+                focusEngine.animateClickCompression(cardContainer) {
+                    onClicked(item)
+                }
             }
 
             cardContainer.setOnLongClickListener {
-                onLongClicked?.invoke(item, position)
+                val resolvedPos = bindingAdapterPosition.takeIf { it >= 0 } ?: position
+                onLongClicked?.invoke(item, resolvedPos)
                 true
             }
         }

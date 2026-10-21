@@ -9,21 +9,28 @@ import android.view.animation.Interpolator
 import org.zenith.tvos.R
 
 /**
- * High-performance spatial focus engine tailored for legacy Android TV chips
- * (Amlogic S905/X/W, MediaTek MT5891, Rockchip RK3328, Mali-450 GPUs).
+ * SpatialFocusEngine: The 60fps Apple TV Focus Coordinator.
  *
- * Performance characteristics:
- * - Constant 60 FPS animation loop with strict 150ms transition budget.
- * - Directional 3D specular card tilt (`rotationY` / `rotationX`) modeled after Apple tvOS UIKit parallax cards.
- * - Boundary rubber-band spring recoil when hitting the start or end of a horizontal dock row.
- * - Hardware layer caching (`View.LAYER_TYPE_HARDWARE`) during D-pad navigation to prevent GPU overdraw.
- * - Zero GC allocations on D-pad navigation events.
+ * Implements the authentic tvOS card elevation, scale-up, 3D directional specular tilt,
+ * multi-layer inner icon/sheen parallax, tactile click compression, and hardware-layer
+ * promotion when a view gains or loses D-pad focus.
  */
 class SpatialFocusEngine(
     val focusScale: Float = DEFAULT_FOCUS_SCALE,
     val animDurationMs: Long = DEFAULT_ANIM_DURATION,
     val useSpringPhysics: Boolean = true
 ) {
+    /**
+     * Multi-layer inner card parallax state for floating app icon and opposite-shifting specular sheen.
+     */
+    data class CardInnerLayerParallax(
+        val iconTranslationX: Float,
+        val iconTranslationY: Float,
+        val iconScale: Float,
+        val sheenTranslationX: Float,
+        val sheenAlpha: Float
+    )
+
     private val springModel = SpringPhysicsModel()
     private val decelerateInterpolator = DecelerateInterpolator(1.8f)
 
@@ -47,6 +54,43 @@ class SpatialFocusEngine(
      */
     fun computeSpecularPitchX(hasFocus: Boolean): Float {
         return if (hasFocus) DEFAULT_SPECULAR_PITCH_X_DEG else 0f
+    }
+
+    /**
+     * Computes the inner foreground icon parallax and opposite-moving specular sheen highlight
+     * for a focused tvOS card.
+     */
+    fun computeCardInnerParallax(
+        hasFocus: Boolean,
+        tiltAngleY: Float,
+        density: Float = 1.0f
+    ): CardInnerLayerParallax {
+        if (!hasFocus) {
+            return CardInnerLayerParallax(
+                iconTranslationX = 0f,
+                iconTranslationY = 0f,
+                iconScale = 1.0f,
+                sheenTranslationX = 0f,
+                sheenAlpha = 0f
+            )
+        }
+        val safeDensity = density.coerceAtLeast(0.5f)
+        val normalizedStep = (tiltAngleY / DIRECTIONAL_TILT_STEP_DEG).coerceIn(-2f, 2f)
+        return CardInnerLayerParallax(
+            iconTranslationX = normalizedStep * DEFAULT_ICON_PARALLAX_SHIFT_DP * safeDensity,
+            iconTranslationY = -DEFAULT_ICON_FOCUS_LIFT_DP * safeDensity,
+            iconScale = DEFAULT_ICON_FOCUS_SCALE,
+            sheenTranslationX = -normalizedStep * DEFAULT_SHEEN_SHIFT_DP * safeDensity,
+            sheenAlpha = DEFAULT_SHEEN_FOCUS_ALPHA
+        )
+    }
+
+    /**
+     * Computes the target card scale during tactile D-pad Center press compression.
+     */
+    fun computePressScale(isPressed: Boolean, isFocused: Boolean = true): Float {
+        if (isPressed) return DEFAULT_PRESS_SCALE
+        return if (isFocused) focusScale else 1.0f
     }
 
     /**
@@ -87,6 +131,78 @@ class SpatialFocusEngine(
                 }
             })
             .start()
+    }
+
+    /**
+     * Executes a tactile tvOS micro-compression animation when D-pad Center is clicked on a card.
+     */
+    fun animateClickCompression(view: View, onComplete: () -> Unit) {
+        val compressedScale = computePressScale(isPressed = true, isFocused = view.hasFocus())
+        val reboundScale = computePressScale(isPressed = false, isFocused = view.hasFocus())
+
+        view.animate()
+            .scaleX(compressedScale)
+            .scaleY(compressedScale)
+            .setDuration(55L)
+            .setInterpolator(decelerateInterpolator)
+            .setListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    view.animate()
+                        .scaleX(reboundScale)
+                        .scaleY(reboundScale)
+                        .setDuration(95L)
+                        .setInterpolator(activeInterpolator)
+                        .setListener(null)
+                        .start()
+                    onComplete()
+                }
+            })
+            .start()
+    }
+
+    /**
+     * Animates the inner floating icon layer and opposite-moving specular sheen inside a tvOS card.
+     */
+    fun animateCardInnerLayers(
+        iconView: View?,
+        sheenView: View?,
+        hasFocus: Boolean,
+        tiltAngleY: Float = 0f
+    ) {
+        val density = iconView?.resources?.displayMetrics?.density ?: 1.0f
+        val inner = computeCardInnerParallax(hasFocus, tiltAngleY, density)
+
+        iconView?.animate()
+            ?.translationX(inner.iconTranslationX)
+            ?.translationY(inner.iconTranslationY)
+            ?.scaleX(inner.iconScale)
+            ?.scaleY(inner.iconScale)
+            ?.setDuration(animDurationMs)
+            ?.setInterpolator(activeInterpolator)
+            ?.withEndAction {
+                if (hasFocus && inner.iconTranslationX != 0f) {
+                    iconView.animate()
+                        .translationX(0f)
+                        .setDuration(110L)
+                        .start()
+                }
+            }
+            ?.start()
+
+        sheenView?.animate()
+            ?.translationX(inner.sheenTranslationX)
+            ?.alpha(inner.sheenAlpha)
+            ?.setDuration(animDurationMs)
+            ?.setInterpolator(decelerateInterpolator)
+            ?.withEndAction {
+                if (hasFocus && inner.sheenTranslationX != 0f) {
+                    sheenView.animate()
+                        .translationX(0f)
+                        .setDuration(110L)
+                        .start()
+                }
+            }
+            ?.start()
     }
 
     /**
@@ -157,9 +273,15 @@ class SpatialFocusEngine(
 
     companion object {
         const val DEFAULT_FOCUS_SCALE = 1.08f
+        const val DEFAULT_PRESS_SCALE = 0.94f
         const val DEFAULT_ANIM_DURATION = 150L
         const val DIRECTIONAL_TILT_STEP_DEG = 3.5f
         const val DEFAULT_SPECULAR_PITCH_X_DEG = 2.0f
         const val DEFAULT_BOUNDARY_BOUNCE_DP = 14f
+        const val DEFAULT_ICON_PARALLAX_SHIFT_DP = 3.5f
+        const val DEFAULT_ICON_FOCUS_LIFT_DP = 4.0f
+        const val DEFAULT_ICON_FOCUS_SCALE = 1.06f
+        const val DEFAULT_SHEEN_SHIFT_DP = 10.0f
+        const val DEFAULT_SHEEN_FOCUS_ALPHA = 0.28f
     }
 }

@@ -10,7 +10,17 @@
     android:background="@drawable/card_default_background"
     android:clipToOutline="true">
 
-    <!-- App Icon inside rounded squircle -->
+    <!-- Apple TV 2.5D Specular Sheen Highlight Layer (moves opposite to 3D card tilt) -->
+    <View
+        android:id="@+id/specularSheen"
+        android:layout_width="110dp"
+        android:layout_height="55dp"
+        android:layout_gravity="top|center_horizontal"
+        android:layout_marginTop="-12dp"
+        android:alpha="0.0"
+        android:background="@drawable/bg_card_specular_sheen" />
+
+    <!-- App Icon inside rounded squircle (foreground parallax layer) -->
     <ImageView
         android:id="@+id/appIcon"
         android:layout_width="60dp"
