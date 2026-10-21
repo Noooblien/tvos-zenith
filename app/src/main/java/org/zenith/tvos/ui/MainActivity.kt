@@ -6,6 +6,8 @@ import android.content.IntentFilter
 import android.content.pm.ApplicationInfo
 import android.graphics.Color
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.KeyEvent
 import android.view.View
 import android.widget.Button
@@ -20,6 +22,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.zenith.tvos.R
+import org.zenith.tvos.core.audio.TactileAudioEngine
 import org.zenith.tvos.core.cache.UltraLightIconCache
 import org.zenith.tvos.core.focus.SpatialFocusEngine
 import org.zenith.tvos.core.input.DPadDebounceDispatcher
@@ -30,15 +33,21 @@ import org.zenith.tvos.core.parallax.ParallaxBackdropEngine
 import org.zenith.tvos.core.performance.FramePacer
 import org.zenith.tvos.core.recommendation.OfflineTopShelfContentEngine
 import org.zenith.tvos.core.remote.ZenithRemoteServer
+import org.zenith.tvos.core.screensaver.IdleScreensaverEngine
 import org.zenith.tvos.core.security.IntentSanitizer
 import org.zenith.tvos.core.security.PackageChangeReceiver
+import org.zenith.tvos.core.settings.SharedPreferencesSettingsStorage
+import org.zenith.tvos.core.settings.WallpaperMode
+import org.zenith.tvos.core.settings.ZenithSettingsManager
 import org.zenith.tvos.core.wallpaper.DynamicWallpaperEngine
 import org.zenith.tvos.ui.dock.AppCategory
 import org.zenith.tvos.ui.dock.AppCategoryClassifier
 import org.zenith.tvos.ui.dock.AppDockAdapter
 import org.zenith.tvos.ui.dock.AppItem
+import org.zenith.tvos.ui.menu.AerialScreensaverDialog
 import org.zenith.tvos.ui.menu.AppContextMenuDialog
 import org.zenith.tvos.ui.menu.PhoneRemotePairingDialog
+import org.zenith.tvos.ui.menu.ZenithSettingsDialog
 import org.zenith.tvos.ui.topshelf.TopShelfHeroView
 
 /**
@@ -48,8 +57,9 @@ import org.zenith.tvos.ui.topshelf.TopShelfHeroView
  * - Pixel-perfect width alignment between TopShelf Hero and Frosted Dock
  * - Authentic Apple TV pill action buttons with fluid focus scaling
  * - Zero-install local Wi-Fi Phone Remote Web Server & Companion App Support
- * - Seamless D-pad vertical traversal & interactive remote card reordering
- * - Air-gapped offline content engine & procedural category wallpapers
+ * - Procedural PCM 16-bit Tactile Audio Engine (zero asset bloat)
+ * - Apple TV Aerial Ambient Screensaver with OLED pixel-shift protection
+ * - Glassmorphic Zenith Settings & Customization modal
  */
 class MainActivity : Activity() {
 
@@ -63,14 +73,20 @@ class MainActivity : Activity() {
     private val framePacer = FramePacer()
     private val menuEngine = AppContextMenuEngine()
     private val remoteServer = ZenithRemoteServer(port = 8080)
+    private val audioEngine = TactileAudioEngine()
+    private val screensaverEngine = IdleScreensaverEngine()
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     private lateinit var libraryManager: AppLibraryManager
+    private lateinit var settingsManager: ZenithSettingsManager
     private lateinit var rootContainer: View
     private lateinit var topShelfHero: TopShelfHeroView
     private lateinit var btnPhoneRemote: Button
+    private lateinit var btnZenithSettings: Button
     private lateinit var focusedAppName: TextView
     private lateinit var appRecyclerView: RecyclerView
     private var packageReceiver: PackageChangeReceiver? = null
+    private var activeScreensaverDialog: AerialScreensaverDialog? = null
 
     private val displayedApps = mutableListOf<AppItem>()
     private var currentCategoryFilter: AppCategory? = null
@@ -93,28 +109,108 @@ class MainActivity : Activity() {
     private lateinit var pillTools: Button
     private lateinit var pillSystem: Button
 
+    private val idleWatcherRunnable = object : Runnable {
+        override fun run() {
+            if (screensaverEngine.checkIdleState()) {
+                launchAerialScreensaver()
+            }
+            mainHandler.postDelayed(this, 5_000L)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         libraryManager = AppLibraryManager(SharedPreferencesAppStorage(this))
+        settingsManager = ZenithSettingsManager(SharedPreferencesSettingsStorage(this))
 
         rootContainer = findViewById(R.id.rootContainer)
         topShelfHero = findViewById(R.id.topShelfHero)
         btnPhoneRemote = findViewById(R.id.btnPhoneRemote)
+        btnZenithSettings = findViewById(R.id.btnZenithSettings)
         focusedAppName = findViewById(R.id.focusedAppName)
         appRecyclerView = findViewById(R.id.appRecyclerView)
 
+        syncSettingsState()
         initCategoryPills()
         setupTopShelfActions()
         initPhoneRemoteServer()
-
-        // Apply default Midnight Obsidian backdrop
-        rootContainer.background = wallpaperEngine.createWallpaperDrawable(DynamicWallpaperEngine.Theme.MIDNIGHT_OBSIDIAN)
+        initSettingsButton()
 
         setupRecyclerView()
         loadInstalledApps()
         registerPackageReceiver()
+    }
+
+    private fun syncSettingsState() {
+        audioEngine.isEnabled = settingsManager.isSoundEnabled
+        screensaverEngine.timeoutMs = settingsManager.screensaverTimeoutSec * 1000L
+        applyCurrentWallpaper(currentFocusedApp?.category)
+    }
+
+    private fun applyCurrentWallpaper(category: AppCategory?) {
+        val theme = when (settingsManager.wallpaperMode) {
+            WallpaperMode.DYNAMIC_CATEGORY -> {
+                if (category != null) {
+                    wallpaperEngine.getThemeForCategory(category.name)
+                } else {
+                    DynamicWallpaperEngine.Theme.MIDNIGHT_OBSIDIAN
+                }
+            }
+            WallpaperMode.MIDNIGHT_OBSIDIAN -> DynamicWallpaperEngine.Theme.MIDNIGHT_OBSIDIAN
+            WallpaperMode.COSMIC_AURORA -> DynamicWallpaperEngine.Theme.COSMIC_AURORA
+            WallpaperMode.DEEP_OCEAN -> DynamicWallpaperEngine.Theme.AERIAL_EARTH
+            WallpaperMode.SOLAR_NEBULA -> DynamicWallpaperEngine.Theme.SOLAR_ECLIPSE
+        }
+        rootContainer.background = wallpaperEngine.createWallpaperDrawable(theme)
+    }
+
+    private fun initSettingsButton() {
+        btnZenithSettings.setOnClickListener {
+            audioEngine.playSelectPop()
+            showSettingsDialog()
+        }
+
+        btnZenithSettings.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                audioEngine.playFocusTick()
+                btnZenithSettings.setTextColor(Color.BLACK)
+            } else {
+                btnZenithSettings.setTextColor(Color.parseColor("#F5F5F7"))
+            }
+        }
+    }
+
+    private fun showSettingsDialog() {
+        ZenithSettingsDialog(
+            context = this,
+            settingsManager = settingsManager,
+            libraryManager = libraryManager,
+            audioEngine = audioEngine,
+            onSettingsChanged = {
+                syncSettingsState()
+                updateDisplayedApps()
+            },
+            onStartScreensaverNow = {
+                screensaverEngine.activateNow()
+                launchAerialScreensaver()
+            }
+        ).show()
+    }
+
+    private fun launchAerialScreensaver() {
+        if (activeScreensaverDialog?.isShowing == true) return
+        val dialog = AerialScreensaverDialog(
+            context = this,
+            wallpaperEngine = wallpaperEngine,
+            onWakeUp = {
+                screensaverEngine.dismiss()
+                activeScreensaverDialog = null
+            }
+        )
+        activeScreensaverDialog = dialog
+        dialog.show()
     }
 
     private fun initPhoneRemoteServer() {
@@ -123,11 +219,13 @@ class MainActivity : Activity() {
         btnPhoneRemote.text = "📱 Remote: $ip:8080"
 
         btnPhoneRemote.setOnClickListener {
+            audioEngine.playSelectPop()
             PhoneRemotePairingDialog(this, remoteUrl).show()
         }
 
-        btnPhoneRemote.setOnFocusChangeListener { view, hasFocus ->
+        btnPhoneRemote.setOnFocusChangeListener { _, hasFocus ->
             if (hasFocus) {
+                audioEngine.playFocusTick()
                 btnPhoneRemote.setTextColor(Color.BLACK)
             } else {
                 btnPhoneRemote.setTextColor(Color.parseColor("#F5F5F7"))
@@ -136,12 +234,19 @@ class MainActivity : Activity() {
 
         remoteServer.onKeyReceived = { keyCode ->
             runOnUiThread {
-                injectKeyEvent(keyCode)
+                screensaverEngine.recordInteraction()
+                if (activeScreensaverDialog?.isShowing == true) {
+                    activeScreensaverDialog?.dismiss()
+                    activeScreensaverDialog = null
+                } else {
+                    injectKeyEvent(keyCode)
+                }
             }
         }
 
         remoteServer.onTextReceived = { text ->
             runOnUiThread {
+                screensaverEngine.recordInteraction()
                 Toast.makeText(this, "Remote Typed: $text", Toast.LENGTH_SHORT).show()
             }
         }
@@ -157,14 +262,18 @@ class MainActivity : Activity() {
     private fun setupTopShelfActions() {
         topShelfHero.primaryActionBtn.nextFocusDownId = R.id.pillFavorites
         topShelfHero.secondaryActionBtn.nextFocusDownId = R.id.pillFavorites
+        topShelfHero.primaryActionBtn.nextFocusUpId = R.id.btnPhoneRemote
+        topShelfHero.secondaryActionBtn.nextFocusUpId = R.id.btnZenithSettings
 
         topShelfHero.onPlayActionClicked = {
+            audioEngine.playSelectPop()
             currentFocusedApp?.let { app ->
                 launchAppSafely(app)
             }
         }
 
         topShelfHero.onDetailsActionClicked = {
+            audioEngine.playSelectPop()
             currentFocusedApp?.let { app ->
                 showContextMenu(app, currentFocusedPos)
             }
@@ -192,12 +301,14 @@ class MainActivity : Activity() {
 
         for ((pill, action) in pills) {
             pill.setOnClickListener {
+                audioEngine.playSelectPop()
                 resetPillSelection()
                 pill.isSelected = true
                 action()
             }
             pill.setOnFocusChangeListener { _, hasFocus ->
                 if (hasFocus) {
+                    audioEngine.playFocusTick()
                     pill.setTextColor(Color.BLACK)
                 } else {
                     pill.setTextColor(Color.parseColor("#F5F5F7"))
@@ -220,16 +331,21 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         framePacer.start()
+        screensaverEngine.recordInteraction()
+        mainHandler.removeCallbacks(idleWatcherRunnable)
+        mainHandler.postDelayed(idleWatcherRunnable, 5_000L)
     }
 
     override fun onPause() {
         super.onPause()
         framePacer.stop()
         dPadDebouncer.reset()
+        mainHandler.removeCallbacks(idleWatcherRunnable)
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        mainHandler.removeCallbacks(idleWatcherRunnable)
         remoteServer.stop()
         packageReceiver?.let { unregisterReceiver(it) }
         iconCache.evictAll()
@@ -242,6 +358,7 @@ class MainActivity : Activity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        screensaverEngine.recordInteraction()
         if (!dPadDebouncer.shouldDispatchKeyEvent(event)) {
             return true
         }
@@ -292,6 +409,7 @@ class MainActivity : Activity() {
             apps = displayedApps,
             focusEngine = focusEngine,
             onAppFocused = { item, position ->
+                audioEngine.playFocusTick()
                 if (!isReordering) {
                     currentFocusedApp = item
                     currentFocusedPos = position
@@ -306,12 +424,12 @@ class MainActivity : Activity() {
                     val transX = parallaxEngine.computeBackdropTranslationX(ratio)
                     topShelfHero.applyParallax(transX)
 
-                    // Procedural Dynamic Wallpaper Shift per App Category
-                    val theme = wallpaperEngine.getThemeForCategory(item.category.name)
-                    rootContainer.background = wallpaperEngine.createWallpaperDrawable(theme)
+                    // Apply selected or dynamic category wallpaper
+                    applyCurrentWallpaper(item.category)
                 }
             },
             onAppClicked = { item ->
+                audioEngine.playSelectPop()
                 if (isReordering) {
                     commitReorder()
                 } else {
@@ -320,6 +438,7 @@ class MainActivity : Activity() {
             },
             onAppLongClicked = { item, position ->
                 if (!isReordering) {
+                    audioEngine.playSelectPop()
                     showContextMenu(item, position)
                 }
             }
@@ -333,6 +452,7 @@ class MainActivity : Activity() {
             focusedAppName.text = first.label
             val heroContent = topShelfEngine.resolveContent(first)
             topShelfHero.updateHero(heroContent)
+            applyCurrentWallpaper(first.category)
         } else {
             currentFocusedApp = null
             focusedAppName.text = "No applications in this category"
@@ -347,6 +467,7 @@ class MainActivity : Activity() {
             isPinned = isPinned,
             focusEngine = focusEngine,
             onTogglePin = { app ->
+                audioEngine.playSelectPop()
                 if (isPinned) {
                     libraryManager.removeFromFavorites(app.packageName)
                     Toast.makeText(this, "Removed ${app.label} from Favorites", Toast.LENGTH_SHORT).show()
@@ -357,9 +478,11 @@ class MainActivity : Activity() {
                 updateDisplayedApps()
             },
             onReorder = { _ ->
+                audioEngine.playSelectPop()
                 startReorder(position)
             },
             onAppInfo = { app ->
+                audioEngine.playSelectPop()
                 val intent = menuEngine.createAppInfoIntent(app.packageName)
                 if (intent != null) {
                     try {
@@ -370,11 +493,13 @@ class MainActivity : Activity() {
                 }
             },
             onHideApp = { app ->
+                audioEngine.playSelectPop()
                 libraryManager.hideApp(app.packageName)
                 Toast.makeText(this, "Hidden ${app.label} from Home", Toast.LENGTH_SHORT).show()
                 updateDisplayedApps()
             },
             onUninstall = { app ->
+                audioEngine.playSelectPop()
                 val intent = menuEngine.createUninstallIntent(app.packageName, app.isSystemApp)
                 if (intent != null) {
                     try {
@@ -413,6 +538,7 @@ class MainActivity : Activity() {
             when (keyCode) {
                 KeyEvent.KEYCODE_DPAD_LEFT -> {
                     if (reorderCurrentPos > 0) {
+                        audioEngine.playFocusTick()
                         val targetPos = reorderCurrentPos - 1
                         if (isViewingFavorites) {
                             libraryManager.moveFavorite(reorderCurrentPos, targetPos)
@@ -426,6 +552,7 @@ class MainActivity : Activity() {
                 }
                 KeyEvent.KEYCODE_DPAD_RIGHT -> {
                     if (reorderCurrentPos < displayedApps.size - 1) {
+                        audioEngine.playFocusTick()
                         val targetPos = reorderCurrentPos + 1
                         if (isViewingFavorites) {
                             libraryManager.moveFavorite(reorderCurrentPos, targetPos)
@@ -438,15 +565,26 @@ class MainActivity : Activity() {
                     return true
                 }
                 KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_BACK -> {
+                    audioEngine.playSelectPop()
                     commitReorder()
                     return true
                 }
             }
         }
 
+        // Open Zenith Settings on remote MENU key
+        if (keyCode == KeyEvent.KEYCODE_MENU) {
+            audioEngine.playSelectPop()
+            showSettingsDialog()
+            return true
+        }
+
         // Intercept back key to prevent launcher destruction
         if (keyCode == KeyEvent.KEYCODE_BACK) {
             if (!isViewingFavorites) {
+                audioEngine.playFocusTick()
+                resetPillSelection()
+                pillFavorites.isSelected = true
                 filterFavorites()
                 pillFavorites.requestFocus()
                 return true

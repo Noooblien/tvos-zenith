@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="440dp"
+    android:layout_height="wrap_content"
+    android:layout_gravity="center"
+    android:background="@drawable/bg_context_menu"
+    android:orientation="vertical"
+    android:padding="28dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="⚙️ Zenith TV Preferences"
+        android:textColor="@color/tvos_text_primary"
+        android:textSize="22sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="20dp"
+        android:text="Customize visual themes, tactile audio, and ambient display"
+        android:textColor="@color/tvos_text_secondary"
+        android:textSize="13sp" />
+
+    <Button
+        android:id="@+id/btnSettingWallpaper"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginBottom="10dp"
+        android:background="@drawable/bg_menu_item"
+        android:focusable="true"
+        android:gravity="start|center_vertical"
+        android:paddingHorizontal="16dp"
+        android:text="🎨 Wallpaper: Dynamic per Category"
+        android:textAllCaps="false"
+        android:textColor="@color/tvos_text_primary"
+        android:textSize="14.5sp" />
+
+    <Button
+        android:id="@+id/btnSettingSound"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginBottom="10dp"
+        android:background="@drawable/bg_menu_item"
+        android:focusable="true"
+        android:gravity="start|center_vertical"
+        android:paddingHorizontal="16dp"
+        android:text="🔊 Tactile Audio Clicks: ON"
+        android:textAllCaps="false"
+        android:textColor="@color/tvos_text_primary"
+        android:textSize="14.5sp" />
+
+    <Button
+        android:id="@+id/btnSettingScreensaver"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginBottom="10dp"
+        android:background="@drawable/bg_menu_item"
+        android:focusable="true"
+        android:gravity="start|center_vertical"
+        android:paddingHorizontal="16dp"
+        android:text="🌙 Ambient Screensaver: 2 Minutes"
+        android:textAllCaps="false"
+        android:textColor="@color/tvos_text_primary"
+        android:textSize="14.5sp" />
+
+    <Button
+        android:id="@+id/btnPreviewScreensaver"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginBottom="10dp"
+        android:background="@drawable/bg_menu_item"
+        android:focusable="true"
+        android:gravity="start|center_vertical"
+        android:paddingHorizontal="16dp"
+        android:text="✨ Start Aerial Screensaver Now"
+        android:textAllCaps="false"
+        android:textColor="@color/tvos_text_primary"
+        android:textSize="14.5sp" />
+
+    <Button
+        android:id="@+id/btnUnhideAll"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginBottom="16dp"
+        android:background="@drawable/bg_menu_item"
+        android:focusable="true"
+        android:gravity="start|center_vertical"
+        android:paddingHorizontal="16dp"
+        android:text="👁️ Restore Hidden Apps (0)"
+        android:textAllCaps="false"
+        android:textColor="@color/tvos_text_primary"
+        android:textSize="14.5sp" />
+
+    <Button
+        android:id="@+id/btnCloseSettings"
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:background="@drawable/bg_pill_button_primary"
+        android:focusable="true"
+        android:text="Done"
+        android:textAllCaps="false"
+        android:textColor="#0B0E14"
+        android:textSize="15sp"
+        android:textStyle="bold" />
+
+</LinearLayout>

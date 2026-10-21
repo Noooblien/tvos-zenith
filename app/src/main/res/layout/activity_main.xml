@@ -20,9 +20,9 @@
         android:layout_marginTop="20dp"
         android:clipChildren="false" />
 
-    <!-- Phone Remote Pairing Status Button (Top Right) -->
-    <Button
-        android:id="@+id/btnPhoneRemote"
+    <!-- Top-Right Utility Controls (Phone Remote & Zenith Settings) -->
+    <LinearLayout
+        android:id="@+id/topUtilityBar"
         android:layout_width="wrap_content"
         android:layout_height="32dp"
         android:layout_alignParentTop="true"
@@ -31,13 +31,40 @@
         android:layout_marginTop="32dp"
         android:layout_marginEnd="68dp"
         android:layout_marginRight="68dp"
-        android:background="@drawable/bg_category_pill"
-        android:focusable="true"
-        android:paddingHorizontal="14dp"
-        android:text="📱 Phone Remote"
-        android:textAllCaps="false"
-        android:textColor="@color/tvos_text_primary"
-        android:textSize="12sp" />
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/btnPhoneRemote"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:layout_marginEnd="8dp"
+            android:layout_marginRight="8dp"
+            android:background="@drawable/bg_category_pill"
+            android:focusable="true"
+            android:nextFocusRight="@+id/btnZenithSettings"
+            android:nextFocusDown="@+id/btnTopShelfPlay"
+            android:paddingHorizontal="14dp"
+            android:text="📱 Phone Remote"
+            android:textAllCaps="false"
+            android:textColor="@color/tvos_text_primary"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/btnZenithSettings"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:background="@drawable/bg_category_pill"
+            android:focusable="true"
+            android:nextFocusLeft="@+id/btnPhoneRemote"
+            android:nextFocusDown="@+id/btnTopShelfPlay"
+            android:paddingHorizontal="14dp"
+            android:text="⚙️ Settings"
+            android:textAllCaps="false"
+            android:textColor="@color/tvos_text_primary"
+            android:textSize="12sp" />
+
+    </LinearLayout>
 
     <!-- tvOS Category Filter Pills Bar (Pixel-aligned with Dock) -->
     <HorizontalScrollView

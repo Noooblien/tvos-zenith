@@ -132,6 +132,24 @@ class AppLibraryManager(
     }
 
     /**
+     * Restores all hidden applications back to visible state.
+     * @return number of applications restored.
+     */
+    fun unhideAllApps(): Int {
+        val count = hiddenPackageNames.size
+        if (count > 0) {
+            hiddenPackageNames.clear()
+            storage?.saveHidden(hiddenPackageNames)
+        }
+        return count
+    }
+
+    /**
+     * Returns the count of currently hidden applications.
+     */
+    fun getHiddenCount(): Int = hiddenPackageNames.size
+
+    /**
      * Returns all visible (non-hidden) installed applications.
      */
     fun getVisibleApps(): List<AppItem> {
