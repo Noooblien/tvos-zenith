@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0B0E14"
+    android:orientation="vertical">
+
+    <!-- Top Connection Bar -->
+    <LinearLayout
+        android:id="@+id/connectionBar"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:background="#161B26"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="16dp">
+
+        <EditText
+            android:id="@+id/etTvIp"
+            android:layout_width="0dp"
+            android:layout_height="38dp"
+            android:layout_weight="1"
+            android:background="#26FFFFFF"
+            android:hint="TV IP: 192.168.1.xxx"
+            android:paddingHorizontal="12dp"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#8E8E93"
+            android:textSize="14sp"
+            android:inputType="textUri" />
+
+        <Button
+            android:id="@+id/btnConnect"
+            android:layout_width="wrap_content"
+            android:layout_height="38dp"
+            android:layout_marginStart="8dp"
+            android:background="#2997FF"
+            android:text="Connect"
+            android:textAllCaps="false"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp" />
+    </LinearLayout>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <WebView
+            android:id="@+id/remoteWebView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <TextView
+            android:id="@+id/tvEmptyState"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:padding="24dp"
+            android:text="Enter Zenith TV IP address above and tap Connect.\n\nMake sure your phone is connected to the same Wi-Fi network."
+            android:textColor="#8E8E93"
+            android:textSize="15sp"
+            android:visibility="gone" />
+    </FrameLayout>
+
+</LinearLayout>

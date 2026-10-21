@@ -14,4 +14,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "tvos-zenith"
-include(":app")
+include(":app", ":remote")

@@ -29,6 +29,7 @@ import org.zenith.tvos.core.menu.AppContextMenuEngine
 import org.zenith.tvos.core.parallax.ParallaxBackdropEngine
 import org.zenith.tvos.core.performance.FramePacer
 import org.zenith.tvos.core.recommendation.OfflineTopShelfContentEngine
+import org.zenith.tvos.core.remote.ZenithRemoteServer
 import org.zenith.tvos.core.security.IntentSanitizer
 import org.zenith.tvos.core.security.PackageChangeReceiver
 import org.zenith.tvos.core.wallpaper.DynamicWallpaperEngine
@@ -37,16 +38,18 @@ import org.zenith.tvos.ui.dock.AppCategoryClassifier
 import org.zenith.tvos.ui.dock.AppDockAdapter
 import org.zenith.tvos.ui.dock.AppItem
 import org.zenith.tvos.ui.menu.AppContextMenuDialog
+import org.zenith.tvos.ui.menu.PhoneRemotePairingDialog
 import org.zenith.tvos.ui.topshelf.TopShelfHeroView
 
 /**
- * Flagship tvOS Zenith Main Launcher Activity.
+ * Flagship Zenith TV Main Launcher Activity.
  *
- * Core Architecture & Visual Refinements:
- * - Pixel-perfect width alignment between TopShelf Hero (24dp radius) and Frosted Dock (24dp radius)
- * - Authentic Apple TV pill action buttons ("▶ Play" and "Details") with fluid focus scaling and elevation
- * - Seamless D-pad vertical traversal: Dock <-> Category Pills <-> TopShelf Action Buttons
- * - Strict 18MB PSS RAM ceiling & zero ad telemetry
+ * Core Architecture & Features:
+ * - Pixel-perfect width alignment between TopShelf Hero and Frosted Dock
+ * - Authentic Apple TV pill action buttons with fluid focus scaling
+ * - Zero-install local Wi-Fi Phone Remote Web Server & Companion App Support
+ * - Seamless D-pad vertical traversal & interactive remote card reordering
+ * - Air-gapped offline content engine & procedural category wallpapers
  */
 class MainActivity : Activity() {
 
@@ -59,10 +62,12 @@ class MainActivity : Activity() {
     private val dPadDebouncer = DPadDebounceDispatcher()
     private val framePacer = FramePacer()
     private val menuEngine = AppContextMenuEngine()
+    private val remoteServer = ZenithRemoteServer(port = 8080)
 
     private lateinit var libraryManager: AppLibraryManager
     private lateinit var rootContainer: View
     private lateinit var topShelfHero: TopShelfHeroView
+    private lateinit var btnPhoneRemote: Button
     private lateinit var focusedAppName: TextView
     private lateinit var appRecyclerView: RecyclerView
     private var packageReceiver: PackageChangeReceiver? = null
@@ -96,11 +101,13 @@ class MainActivity : Activity() {
 
         rootContainer = findViewById(R.id.rootContainer)
         topShelfHero = findViewById(R.id.topShelfHero)
+        btnPhoneRemote = findViewById(R.id.btnPhoneRemote)
         focusedAppName = findViewById(R.id.focusedAppName)
         appRecyclerView = findViewById(R.id.appRecyclerView)
 
         initCategoryPills()
         setupTopShelfActions()
+        initPhoneRemoteServer()
 
         // Apply default Midnight Obsidian backdrop
         rootContainer.background = wallpaperEngine.createWallpaperDrawable(DynamicWallpaperEngine.Theme.MIDNIGHT_OBSIDIAN)
@@ -108,6 +115,43 @@ class MainActivity : Activity() {
         setupRecyclerView()
         loadInstalledApps()
         registerPackageReceiver()
+    }
+
+    private fun initPhoneRemoteServer() {
+        val ip = ZenithRemoteServer.getLocalIpAddress() ?: "127.0.0.1"
+        val remoteUrl = "http://$ip:8080"
+        btnPhoneRemote.text = "📱 Remote: $ip:8080"
+
+        btnPhoneRemote.setOnClickListener {
+            PhoneRemotePairingDialog(this, remoteUrl).show()
+        }
+
+        btnPhoneRemote.setOnFocusChangeListener { view, hasFocus ->
+            if (hasFocus) {
+                btnPhoneRemote.setTextColor(Color.BLACK)
+            } else {
+                btnPhoneRemote.setTextColor(Color.parseColor("#F5F5F7"))
+            }
+        }
+
+        remoteServer.onKeyReceived = { keyCode ->
+            runOnUiThread {
+                injectKeyEvent(keyCode)
+            }
+        }
+
+        remoteServer.onTextReceived = { text ->
+            runOnUiThread {
+                Toast.makeText(this, "Remote Typed: $text", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        remoteServer.start()
+    }
+
+    private fun injectKeyEvent(keyCode: Int) {
+        dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
+        dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, keyCode))
     }
 
     private fun setupTopShelfActions() {
@@ -186,6 +230,7 @@ class MainActivity : Activity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        remoteServer.stop()
         packageReceiver?.let { unregisterReceiver(it) }
         iconCache.evictAll()
         scope.cancel()

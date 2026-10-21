@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="440dp"
+    android:layout_height="wrap_content"
+    android:layout_gravity="center"
+    android:background="@drawable/bg_context_menu"
+    android:gravity="center_horizontal"
+    android:orientation="vertical"
+    android:padding="32dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="📱 Phone Remote Control"
+        android:textColor="@color/tvos_text_primary"
+        android:textSize="22sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:gravity="center"
+        android:text="Connect any iPhone or Android phone on the same Wi-Fi. No app store installation required."
+        android:textColor="@color/tvos_text_secondary"
+        android:textSize="14sp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginVertical="24dp"
+        android:background="#26FFFFFF"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="OPEN IN PHONE BROWSER:"
+            android:textColor="@color/tvos_accent_cyan"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.08" />
+
+        <TextView
+            android:id="@+id/tvRemoteUrl"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="http://192.168.1.150:8080"
+            android:textColor="#FFFFFF"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/btnDismissRemoteDialog"
+        android:layout_width="160dp"
+        android:layout_height="44dp"
+        android:background="@drawable/bg_pill_button_primary"
+        android:focusable="true"
+        android:text="Done"
+        android:textAllCaps="false"
+        android:textColor="#0B0E14"
+        android:textSize="15sp"
+        android:textStyle="bold" />
+
+</LinearLayout>

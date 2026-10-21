@@ -13,8 +13,10 @@
         android:name="android.hardware.microphone"
         android:required="false" />
 
-    <!-- Pure Security Stance: Zero Internet Permission Required -->
-    <!-- Zero network telemetry, zero ad tracking, air-gapped launcher operation -->
+    <!-- Local Wi-Fi Network Permissions for Zero-Config Phone Remote Control -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     
     <!-- Required to query installed apps on Android 11+ (API 30+) -->
     <uses-permission
@@ -29,7 +31,7 @@
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.ZenithTvOS"
-        android:usesCleartextTraffic="false"
+        android:usesCleartextTraffic="true"
         tools:targetApi="34">
 
         <!-- Primary Leanback Home Launcher Activity -->
