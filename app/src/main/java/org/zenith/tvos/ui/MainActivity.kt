@@ -42,13 +42,11 @@ import org.zenith.tvos.ui.topshelf.TopShelfHeroView
 /**
  * Flagship tvOS Zenith Main Launcher Activity.
  *
- * Core Architecture & Guarantees:
- * - < 120ms cold boot
- * - Zero background analytics or ad SDKs
- * - Strict 18MB PSS RAM ceiling
- * - Solid 60 FPS D-pad navigation with Spring Physics, Parallax, Procedural Wallpapers & D-Pad Debouncing
- * - Air-gapped Offline Top Shelf dynamic content resolution
- * - Categorized App Drawer Grid & interactive long-press Context Menu with D-pad reordering
+ * Core Architecture & Visual Refinements:
+ * - Pixel-perfect width alignment between TopShelf Hero (24dp radius) and Frosted Dock (24dp radius)
+ * - Authentic Apple TV pill action buttons ("▶ Play" and "Details") with fluid focus scaling and elevation
+ * - Seamless D-pad vertical traversal: Dock <-> Category Pills <-> TopShelf Action Buttons
+ * - Strict 18MB PSS RAM ceiling & zero ad telemetry
  */
 class MainActivity : Activity() {
 
@@ -72,6 +70,10 @@ class MainActivity : Activity() {
     private val displayedApps = mutableListOf<AppItem>()
     private var currentCategoryFilter: AppCategory? = null
     private var isViewingFavorites: Boolean = true
+
+    // Currently focused app tracker for Top Shelf action dispatch
+    private var currentFocusedApp: AppItem? = null
+    private var currentFocusedPos: Int = 0
 
     // Interactive Remote Reorder State
     private var isReordering: Boolean = false
@@ -98,6 +100,7 @@ class MainActivity : Activity() {
         appRecyclerView = findViewById(R.id.appRecyclerView)
 
         initCategoryPills()
+        setupTopShelfActions()
 
         // Apply default Midnight Obsidian backdrop
         rootContainer.background = wallpaperEngine.createWallpaperDrawable(DynamicWallpaperEngine.Theme.MIDNIGHT_OBSIDIAN)
@@ -105,6 +108,23 @@ class MainActivity : Activity() {
         setupRecyclerView()
         loadInstalledApps()
         registerPackageReceiver()
+    }
+
+    private fun setupTopShelfActions() {
+        topShelfHero.primaryActionBtn.nextFocusDownId = R.id.pillFavorites
+        topShelfHero.secondaryActionBtn.nextFocusDownId = R.id.pillFavorites
+
+        topShelfHero.onPlayActionClicked = {
+            currentFocusedApp?.let { app ->
+                launchAppSafely(app)
+            }
+        }
+
+        topShelfHero.onDetailsActionClicked = {
+            currentFocusedApp?.let { app ->
+                showContextMenu(app, currentFocusedPos)
+            }
+        }
     }
 
     private fun initCategoryPills() {
@@ -228,13 +248,15 @@ class MainActivity : Activity() {
             focusEngine = focusEngine,
             onAppFocused = { item, position ->
                 if (!isReordering) {
+                    currentFocusedApp = item
+                    currentFocusedPos = position
                     focusedAppName.text = item.label
 
                     // Offline contextual Top Shelf content resolution
                     val heroContent = topShelfEngine.resolveContent(item)
                     topShelfHero.updateHero(heroContent)
 
-                    // Apple TV Dynamic 2.5D Parallax Shift
+                    // Apple TV Dynamic 2.5D Parallax Shift (Internal content translation)
                     val ratio = parallaxEngine.computeNormalizedRatio(position, displayedApps.size)
                     val transX = parallaxEngine.computeBackdropTranslationX(ratio)
                     topShelfHero.applyParallax(transX)
@@ -261,10 +283,13 @@ class MainActivity : Activity() {
 
         if (displayedApps.isNotEmpty()) {
             val first = displayedApps[0]
+            currentFocusedApp = first
+            currentFocusedPos = 0
             focusedAppName.text = first.label
             val heroContent = topShelfEngine.resolveContent(first)
             topShelfHero.updateHero(heroContent)
         } else {
+            currentFocusedApp = null
             focusedAppName.text = "No applications in this category"
         }
     }

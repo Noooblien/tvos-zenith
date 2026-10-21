@@ -2,19 +2,21 @@ package org.zenith.tvos.ui.topshelf
 
 import android.content.Context
 import android.graphics.Color
-import android.graphics.drawable.GradientDrawable
 import android.util.AttributeSet
 import android.view.Gravity
+import android.view.SoundEffectConstants
+import android.view.View
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
+import org.zenith.tvos.R
 import org.zenith.tvos.core.recommendation.OfflineTopShelfContentEngine
 
 /**
  * Apple TV Top Shelf dynamic hero container.
- * Displays high-impact cinematic backdrop, metadata badges, quick-action buttons,
- * and responds to horizontal D-pad parallax motion.
+ * Displays high-impact cinematic backdrop, metadata badges, authentic tvOS capsule buttons,
+ * and responds to horizontal D-pad parallax motion internally while maintaining perfect outer border alignment.
  */
 class TopShelfHeroView @JvmOverloads constructor(
     context: Context,
@@ -22,25 +24,28 @@ class TopShelfHeroView @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : FrameLayout(context, attrs, defStyleAttr) {
 
+    private val contentLayout: LinearLayout
     private val titleView: TextView
     private val metaBadgeView: TextView
     private val synopsisView: TextView
     private val actionContainer: LinearLayout
-    private val primaryActionBtn: Button
-    private val secondaryActionBtn: Button
+    val primaryActionBtn: Button
+    val secondaryActionBtn: Button
+
+    var onPlayActionClicked: (() -> Unit)? = null
+    var onDetailsActionClicked: (() -> Unit)? = null
 
     init {
-        // Deep obsidian background with rounded container
-        val bgDrawable = GradientDrawable().apply {
-            cornerRadius = 32f
-            colors = intArrayOf(Color.parseColor("#1C2436"), Color.parseColor("#0F1420"))
-            gradientType = GradientDrawable.LINEAR_GRADIENT
-            setStroke(2, Color.parseColor("#1FFFFFFF"))
-        }
-        background = bgDrawable
-        setPadding(48, 40, 48, 40)
+        // Pixel-aligned 24dp corner radius & 1.5dp frosted border
+        setBackgroundResource(R.drawable.bg_topshelf_hero)
+        clipToOutline = true
 
-        val contentLayout = LinearLayout(context).apply {
+        val density = context.resources.displayMetrics.density
+        val padH = (36 * density).toInt()
+        val padV = (28 * density).toInt()
+        setPadding(padH, padV, padH, padV)
+
+        contentLayout = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.BOTTOM or Gravity.START
         }
@@ -55,37 +60,73 @@ class TopShelfHeroView @JvmOverloads constructor(
         titleView = TextView(context).apply {
             text = "Zenith Cinematic Engine"
             setTextColor(Color.parseColor("#F5F5F7"))
-            textSize = 34f
+            textSize = 32f
             setTypeface(typeface, android.graphics.Typeface.BOLD)
-            setPadding(0, 8, 0, 8)
+            setPadding(0, (6 * density).toInt(), 0, (6 * density).toInt())
         }
 
         synopsisView = TextView(context).apply {
             text = "Ultra-fluid, ad-free Apple TV aesthetic built exclusively for legacy Android TV hardware."
             setTextColor(Color.parseColor("#D1D1D6"))
-            textSize = 14f
+            textSize = 13.5f
             maxLines = 2
         }
 
+        val btnHeight = (42 * density).toInt()
+        val btnPadH = (22 * density).toInt()
+        val btnPadV = (8 * density).toInt()
+        val btnGap = (16 * density).toInt()
+
         actionContainer = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
-            setPadding(0, 20, 0, 0)
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, (18 * density).toInt(), 0, 0)
         }
 
         primaryActionBtn = Button(context).apply {
+            id = R.id.btnTopShelfPlay
             text = "▶ Play"
-            setBackgroundColor(Color.WHITE)
-            setTextColor(Color.BLACK)
-            textSize = 13f
+            setBackgroundResource(R.drawable.bg_pill_button_primary)
+            setTextColor(Color.parseColor("#0B0E14"))
+            textSize = 13.5f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
             isFocusable = true
+            isFocusableInTouchMode = false
+            setPadding(btnPadH, btnPadV, btnPadH, btnPadV)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                btnHeight
+            ).apply {
+                marginEnd = btnGap
+                rightMargin = btnGap
+            }
         }
 
         secondaryActionBtn = Button(context).apply {
+            id = R.id.btnTopShelfDetails
             text = "Details"
-            setBackgroundColor(Color.parseColor("#33FFFFFF"))
-            setTextColor(Color.WHITE)
-            textSize = 13f
+            setBackgroundResource(R.drawable.bg_pill_button_secondary)
+            setTextColor(Color.parseColor("#F5F5F7"))
+            textSize = 13.5f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
             isFocusable = true
+            isFocusableInTouchMode = false
+            setPadding(btnPadH, btnPadV, btnPadH, btnPadV)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                btnHeight
+            )
+        }
+
+        // Attach Apple TV fluid scale & tactile feedback on focus
+        setupButtonFocus(primaryActionBtn, isPrimary = true)
+        setupButtonFocus(secondaryActionBtn, isPrimary = false)
+
+        primaryActionBtn.setOnClickListener {
+            onPlayActionClicked?.invoke()
+        }
+        secondaryActionBtn.setOnClickListener {
+            onDetailsActionClicked?.invoke()
         }
 
         actionContainer.addView(primaryActionBtn)
@@ -102,6 +143,31 @@ class TopShelfHeroView @JvmOverloads constructor(
         addView(contentLayout, params)
     }
 
+    private fun setupButtonFocus(button: Button, isPrimary: Boolean) {
+        button.setOnFocusChangeListener { view, hasFocus ->
+            if (hasFocus) {
+                view.playSoundEffect(SoundEffectConstants.NAVIGATION_RIGHT)
+                view.animate()
+                    .scaleX(1.08f)
+                    .scaleY(1.08f)
+                    .translationZ(12f)
+                    .setDuration(120L)
+                    .start()
+                button.setTextColor(Color.BLACK)
+            } else {
+                view.animate()
+                    .scaleX(1.0f)
+                    .scaleY(1.0f)
+                    .translationZ(0f)
+                    .setDuration(120L)
+                    .start()
+                button.setTextColor(
+                    if (isPrimary) Color.parseColor("#0B0E14") else Color.parseColor("#F5F5F7")
+                )
+            }
+        }
+    }
+
     /**
      * Dynamically updates the Top Shelf content when the user hovers over an app card.
      */
@@ -112,13 +178,13 @@ class TopShelfHeroView @JvmOverloads constructor(
         primaryAction: String = "▶ Play",
         secondaryAction: String = "Details"
     ) {
-        animate().alpha(0.4f).setDuration(80L).withEndAction {
+        contentLayout.animate().alpha(0.4f).setDuration(70L).withEndAction {
             titleView.text = title
             synopsisView.text = subtitle
             metaBadgeView.text = meta
             primaryActionBtn.text = primaryAction
             secondaryActionBtn.text = secondaryAction
-            animate().alpha(1.0f).setDuration(120L).start()
+            contentLayout.animate().alpha(1.0f).setDuration(100L).start()
         }.start()
     }
 
@@ -136,10 +202,11 @@ class TopShelfHeroView @JvmOverloads constructor(
     }
 
     /**
-     * Applies subtle parallax translation to hero container during D-pad carousel navigation.
+     * Applies subtle internal parallax translation to contentLayout during D-pad navigation.
+     * Keeps outer border anchored with pixel perfection to the bottom dock.
      */
     fun applyParallax(translationX: Float) {
-        animate()
+        contentLayout.animate()
             .translationX(translationX)
             .setDuration(150L)
             .start()
