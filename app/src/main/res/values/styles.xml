@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Core tvOS Theme -->
+    <style name="Theme.ZenithTvOS" parent="Theme.Leanback">
+        <item name="android:windowBackground">@color/tvos_background</item>
+        <item name="android:textColorPrimary">@color/tvos_text_primary</item>
+        <item name="android:textColorSecondary">@color/tvos_text_secondary</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowFullscreen">true</item>
+    </style>
+
+    <style name="Theme.ZenithTvOS.Launcher" parent="Theme.ZenithTvOS">
+        <item name="android:windowShowWallpaper">false</item>
+        <item name="android:windowDisablePreview">true</item>
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
+</resources>

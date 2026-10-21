@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/cardContainer"
+    android:layout_width="150dp"
+    android:layout_height="95dp"
+    android:layout_margin="12dp"
+    android:clickable="true"
+    android:focusable="true"
+    android:focusableInTouchMode="false"
+    android:background="@drawable/card_default_background"
+    android:clipToOutline="true">
+
+    <!-- App Icon inside rounded squircle -->
+    <ImageView
+        android:id="@+id/appIcon"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
+        android:layout_gravity="center"
+        android:contentDescription="@null"
+        android:scaleType="fitCenter" />
+
+    <!-- App Title (Only revealed or emphasized on focus) -->
+    <TextView
+        android:id="@+id/appTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="4dp"
+        android:ellipsize="end"
+        android:gravity="center"
+        android:maxLines="1"
+        android:paddingHorizontal="6dp"
+        android:textColor="@color/tvos_text_primary"
+        android:textSize="11sp"
+        android:visibility="gone" />
+
+</FrameLayout>

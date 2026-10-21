@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">tvOS Zenith</string>
+    <string name="top_shelf_featured">FEATURED</string>
+    <string name="search_hint">Search Movies, Shows, and Apps…</string>
+    <string name="category_favorites">Favorites</string>
+    <string name="category_media">Streaming &amp; Media</string>
+    <string name="category_tools">System Tools</string>
+    <string name="play_action">Play</string>
+    <string name="details_action">Details</string>
+    <string name="settings_title">tvOS Settings</string>
+</resources>

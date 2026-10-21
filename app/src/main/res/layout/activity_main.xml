@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/rootContainer"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/tvos_background"
+    android:clipChildren="false"
+    android:clipToPadding="false">
+
+    <!-- Top Shelf Cinematic Hero Container -->
+    <org.zenith.tvos.ui.topshelf.TopShelfHeroView
+        android:id="@+id/topShelfHero"
+        android:layout_width="match_parent"
+        android:layout_height="320dp"
+        android:layout_alignParentTop="true"
+        android:layout_marginHorizontal="48dp"
+        android:layout_marginTop="24dp"
+        android:clipChildren="false" />
+
+    <!-- Current Focused App Title Label -->
+    <TextView
+        android:id="@+id/focusedAppName"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_above="@id/dockContainer"
+        android:layout_centerHorizontal="true"
+        android:layout_marginBottom="12dp"
+        android:fontFamily="sans-serif-medium"
+        android:text=""
+        android:textColor="@color/tvos_text_primary"
+        android:textSize="18sp"
+        android:alpha="0.9" />
+
+    <!-- Frosted Bottom Dock Container -->
+    <FrameLayout
+        android:id="@+id/dockContainer"
+        android:layout_width="match_parent"
+        android:layout_height="130dp"
+        android:layout_alignParentBottom="true"
+        android:layout_marginHorizontal="36dp"
+        android:layout_marginBottom="28dp"
+        android:background="@drawable/bg_frosted_dock"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:paddingHorizontal="24dp"
+        android:paddingVertical="8dp">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/appRecyclerView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            android:descendantFocusability="afterDescendants"
+            android:overScrollMode="never" />
+
+    </FrameLayout>
+
+</RelativeLayout>
