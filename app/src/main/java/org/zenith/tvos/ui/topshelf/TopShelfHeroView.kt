@@ -5,7 +5,6 @@ import android.graphics.Color
 import android.util.AttributeSet
 import android.view.Gravity
 import android.view.SoundEffectConstants
-import android.view.View
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -14,9 +13,10 @@ import org.zenith.tvos.R
 import org.zenith.tvos.core.recommendation.OfflineTopShelfContentEngine
 
 /**
- * Apple TV Top Shelf dynamic hero container.
+ * Apple TV Top Shelf dynamic hero & multi-slide showcase carousel container.
  * Displays high-impact cinematic backdrop, metadata badges, authentic tvOS capsule buttons,
- * and responds to horizontal D-pad parallax motion internally while maintaining perfect outer border alignment.
+ * pagination indicator dots, and responds to horizontal D-pad parallax motion internally
+ * while maintaining perfect outer border alignment.
  */
 class TopShelfHeroView @JvmOverloads constructor(
     context: Context,
@@ -29,6 +29,7 @@ class TopShelfHeroView @JvmOverloads constructor(
     private val metaBadgeView: TextView
     private val synopsisView: TextView
     private val actionContainer: LinearLayout
+    private val carouselDotsView: TextView
     val primaryActionBtn: Button
     val secondaryActionBtn: Button
 
@@ -118,6 +119,13 @@ class TopShelfHeroView @JvmOverloads constructor(
             )
         }
 
+        carouselDotsView = TextView(context).apply {
+            text = "●  ○  ○"
+            setTextColor(Color.parseColor("#B3EBEBF5"))
+            textSize = 12f
+            letterSpacing = 0.15f
+        }
+
         // Attach Apple TV fluid scale & tactile feedback on focus
         setupButtonFocus(primaryActionBtn, isPrimary = true)
         setupButtonFocus(secondaryActionBtn, isPrimary = false)
@@ -141,6 +149,11 @@ class TopShelfHeroView @JvmOverloads constructor(
             gravity = Gravity.BOTTOM
         }
         addView(contentLayout, params)
+
+        val dotsParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply {
+            gravity = Gravity.BOTTOM or Gravity.END
+        }
+        addView(carouselDotsView, dotsParams)
     }
 
     private fun setupButtonFocus(button: Button, isPrimary: Boolean) {
@@ -169,14 +182,16 @@ class TopShelfHeroView @JvmOverloads constructor(
     }
 
     /**
-     * Dynamically updates the Top Shelf content when the user hovers over an app card.
+     * Dynamically updates the Top Shelf content when the user hovers over an app card
+     * or when the Top Shelf Showcase Carousel advances.
      */
     fun updateHero(
         title: String,
         subtitle: String,
         meta: String,
         primaryAction: String = "▶ Play",
-        secondaryAction: String = "Details"
+        secondaryAction: String = "Details",
+        carouselDots: String = "●  ○  ○"
     ) {
         contentLayout.animate().alpha(0.4f).setDuration(70L).withEndAction {
             titleView.text = title
@@ -184,6 +199,7 @@ class TopShelfHeroView @JvmOverloads constructor(
             metaBadgeView.text = meta
             primaryActionBtn.text = primaryAction
             secondaryActionBtn.text = secondaryAction
+            carouselDotsView.text = carouselDots
             contentLayout.animate().alpha(1.0f).setDuration(100L).start()
         }.start()
     }
@@ -197,7 +213,8 @@ class TopShelfHeroView @JvmOverloads constructor(
             subtitle = content.subtitle,
             meta = content.badgeMeta,
             primaryAction = content.primaryActionLabel,
-            secondaryAction = content.secondaryActionLabel
+            secondaryAction = content.secondaryActionLabel,
+            carouselDots = content.formatCarouselDots()
         )
     }
 

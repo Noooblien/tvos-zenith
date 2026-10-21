@@ -107,9 +107,10 @@ class MainActivity : Activity() {
     private var isViewingFavorites: Boolean = true
     private var isViewingRecent: Boolean = false
 
-    // Currently focused app tracker for Top Shelf action dispatch
+    // Currently focused app tracker & Showcase Carousel slide index for Top Shelf
     private var currentFocusedApp: AppItem? = null
     private var currentFocusedPos: Int = 0
+    private var currentHeroSlideIndex: Int = 0
 
     // Interactive Remote Reorder State
     private var isReordering: Boolean = false
@@ -140,6 +141,19 @@ class MainActivity : Activity() {
                 val snap = healthEngine.captureSnapshot()
                 tvTelemetryHud.text = snap.formatHudLine()
                 mainHandler.postDelayed(this, 1_000L)
+            }
+        }
+    }
+
+    private val topShelfCarouselRunnable = object : Runnable {
+        override fun run() {
+            if (settingsManager.isTopShelfAutoCycleEnabled && !isReordering) {
+                currentFocusedApp?.let { app ->
+                    currentHeroSlideIndex = (currentHeroSlideIndex + 1) % 3
+                    val slideContent = topShelfEngine.resolveSlide(app, currentHeroSlideIndex)
+                    topShelfHero.updateHero(slideContent)
+                }
+                mainHandler.postDelayed(this, 6_000L)
             }
         }
     }
@@ -185,6 +199,11 @@ class MainActivity : Activity() {
         } else {
             tvTelemetryHud.visibility = View.GONE
             mainHandler.removeCallbacks(hudTickerRunnable)
+        }
+
+        mainHandler.removeCallbacks(topShelfCarouselRunnable)
+        if (settingsManager.isTopShelfAutoCycleEnabled) {
+            mainHandler.postDelayed(topShelfCarouselRunnable, 6_000L)
         }
     }
 
@@ -475,6 +494,10 @@ class MainActivity : Activity() {
             mainHandler.removeCallbacks(hudTickerRunnable)
             mainHandler.postDelayed(hudTickerRunnable, 1_000L)
         }
+        mainHandler.removeCallbacks(topShelfCarouselRunnable)
+        if (settingsManager.isTopShelfAutoCycleEnabled) {
+            mainHandler.postDelayed(topShelfCarouselRunnable, 6_000L)
+        }
     }
 
     override fun onPause() {
@@ -483,12 +506,14 @@ class MainActivity : Activity() {
         dPadDebouncer.reset()
         mainHandler.removeCallbacks(idleWatcherRunnable)
         mainHandler.removeCallbacks(hudTickerRunnable)
+        mainHandler.removeCallbacks(topShelfCarouselRunnable)
     }
 
     override fun onDestroy() {
         super.onDestroy()
         mainHandler.removeCallbacks(idleWatcherRunnable)
         mainHandler.removeCallbacks(hudTickerRunnable)
+        mainHandler.removeCallbacks(topShelfCarouselRunnable)
         remoteServer.stop()
         packageReceiver?.let { unregisterReceiver(it) }
         iconCache.evictAll()
@@ -576,11 +601,16 @@ class MainActivity : Activity() {
                 if (!isReordering) {
                     currentFocusedApp = item
                     currentFocusedPos = position
+                    currentHeroSlideIndex = 0
                     focusedAppName.text = formatFocusedAppTitle(item)
 
-                    // Offline contextual Top Shelf content resolution
-                    val heroContent = topShelfEngine.resolveContent(item)
+                    // Offline contextual Top Shelf content resolution (reset to slide 0)
+                    val heroContent = topShelfEngine.resolveSlide(item, 0)
                     topShelfHero.updateHero(heroContent)
+                    mainHandler.removeCallbacks(topShelfCarouselRunnable)
+                    if (settingsManager.isTopShelfAutoCycleEnabled) {
+                        mainHandler.postDelayed(topShelfCarouselRunnable, 6_000L)
+                    }
 
                     // Apple TV Dynamic 2.5D Parallax Shift (Internal content translation)
                     val ratio = parallaxEngine.computeNormalizedRatio(position, displayedApps.size)
@@ -612,8 +642,9 @@ class MainActivity : Activity() {
             val first = displayedApps[0]
             currentFocusedApp = first
             currentFocusedPos = 0
+            currentHeroSlideIndex = 0
             focusedAppName.text = formatFocusedAppTitle(first)
-            val heroContent = topShelfEngine.resolveContent(first)
+            val heroContent = topShelfEngine.resolveSlide(first, 0)
             topShelfHero.updateHero(heroContent)
             applyCurrentWallpaper(first.category)
         } else {

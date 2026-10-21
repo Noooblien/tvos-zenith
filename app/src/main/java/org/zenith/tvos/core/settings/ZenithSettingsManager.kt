@@ -26,6 +26,8 @@ interface SettingsStorage {
     fun setScreensaverTimeoutSec(seconds: Int)
     fun isHudOverlayEnabled(): Boolean
     fun setHudOverlayEnabled(enabled: Boolean)
+    fun isTopShelfAutoCycleEnabled(): Boolean = true
+    fun setTopShelfAutoCycleEnabled(enabled: Boolean) {}
 }
 
 /**
@@ -71,12 +73,21 @@ class SharedPreferencesSettingsStorage(context: Context) : SettingsStorage {
         prefs.edit().putBoolean(KEY_HUD_OVERLAY_ENABLED, enabled).apply()
     }
 
+    override fun isTopShelfAutoCycleEnabled(): Boolean {
+        return prefs.getBoolean(KEY_TOPSHELF_AUTOCYCLE_ENABLED, true)
+    }
+
+    override fun setTopShelfAutoCycleEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_TOPSHELF_AUTOCYCLE_ENABLED, enabled).apply()
+    }
+
     companion object {
         private const val PREFS_NAME = "zenith_tv_settings_prefs"
         private const val KEY_WALLPAPER_MODE = "wallpaper_mode"
         private const val KEY_SOUND_ENABLED = "tactile_sound_enabled"
         private const val KEY_SCREENSAVER_TIMEOUT = "screensaver_timeout_sec"
         private const val KEY_HUD_OVERLAY_ENABLED = "hud_overlay_enabled"
+        private const val KEY_TOPSHELF_AUTOCYCLE_ENABLED = "topshelf_autocycle_enabled"
     }
 }
 
@@ -104,6 +115,10 @@ class ZenithSettingsManager(
         get() = storage.isHudOverlayEnabled()
         set(value) = storage.setHudOverlayEnabled(value)
 
+    var isTopShelfAutoCycleEnabled: Boolean
+        get() = storage.isTopShelfAutoCycleEnabled()
+        set(value) = storage.setTopShelfAutoCycleEnabled(value)
+
     fun cycleWallpaperMode(): WallpaperMode {
         val values = WallpaperMode.values()
         val nextIndex = (wallpaperMode.ordinal + 1) % values.size
@@ -121,6 +136,12 @@ class ZenithSettingsManager(
     fun toggleHudOverlay(): Boolean {
         val next = !isHudOverlayEnabled
         isHudOverlayEnabled = next
+        return next
+    }
+
+    fun toggleTopShelfAutoCycle(): Boolean {
+        val next = !isTopShelfAutoCycleEnabled
+        isTopShelfAutoCycleEnabled = next
         return next
     }
 

@@ -19,6 +19,7 @@ class OfflineTopShelfContentEngineTest {
         assertEquals("Netflix", content.title)
         assertTrue(content.badgeMeta.contains("4K ULTRA HD"))
         assertEquals("▶ Watch Now", content.primaryActionLabel)
+        assertEquals("●  ○  ○", content.formatCarouselDots())
     }
 
     @Test
@@ -49,5 +50,21 @@ class OfflineTopShelfContentEngineTest {
         assertEquals("Settings", content.title)
         assertTrue(content.badgeMeta.contains("SYSTEM"))
         assertEquals("Open Settings", content.primaryActionLabel)
+    }
+
+    @Test
+    fun testCarouselMultiSlideResolutionAndDotFormatting() {
+        val app = AppItem("com.netflix.ninja", "com.netflix.ninja.MainActivity", "Netflix", category = AppCategory.STREAMING)
+        val slides = engine.resolveCarouselSlides(app)
+
+        assertEquals(3, slides.size)
+        assertEquals("●  ○  ○", slides[0].formatCarouselDots())
+        assertEquals("○  ●  ○", slides[1].formatCarouselDots())
+        assertEquals("○  ○  ●", slides[2].formatCarouselDots())
+
+        // Wrapping index via resolveSlide
+        val wrapped = engine.resolveSlide(app, 4) // 4 % 3 == 1
+        assertEquals(slides[1].title, wrapped.title)
+        assertEquals("○  ●  ○", wrapped.formatCarouselDots())
     }
 }

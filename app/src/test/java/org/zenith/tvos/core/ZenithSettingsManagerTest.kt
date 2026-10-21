@@ -15,6 +15,7 @@ class ZenithSettingsManagerTest {
         private var sound: Boolean = true
         private var timeoutSec: Int = 120
         private var hud: Boolean = false
+        private var topShelfCycle: Boolean = true
 
         override fun getWallpaperMode(): WallpaperMode = mode
         override fun setWallpaperMode(mode: WallpaperMode) { this.mode = mode }
@@ -24,6 +25,8 @@ class ZenithSettingsManagerTest {
         override fun setScreensaverTimeoutSec(seconds: Int) { this.timeoutSec = seconds }
         override fun isHudOverlayEnabled(): Boolean = hud
         override fun setHudOverlayEnabled(enabled: Boolean) { this.hud = enabled }
+        override fun isTopShelfAutoCycleEnabled(): Boolean = topShelfCycle
+        override fun setTopShelfAutoCycleEnabled(enabled: Boolean) { this.topShelfCycle = enabled }
     }
 
     @Test
@@ -39,10 +42,11 @@ class ZenithSettingsManagerTest {
     }
 
     @Test
-    fun `toggles tactile sound and HUD overlay state accurately`() {
+    fun `toggles tactile sound, HUD overlay, and Top Shelf carousel state accurately`() {
         val manager = ZenithSettingsManager(InMemorySettingsStorage())
         assertTrue(manager.isSoundEnabled)
         assertFalse(manager.isHudOverlayEnabled)
+        assertTrue(manager.isTopShelfAutoCycleEnabled)
 
         assertFalse(manager.toggleSound())
         assertFalse(manager.isSoundEnabled)
@@ -51,6 +55,11 @@ class ZenithSettingsManagerTest {
         assertTrue(manager.toggleHudOverlay())
         assertTrue(manager.isHudOverlayEnabled)
         assertFalse(manager.toggleHudOverlay())
+
+        assertFalse(manager.toggleTopShelfAutoCycle())
+        assertFalse(manager.isTopShelfAutoCycleEnabled)
+        assertTrue(manager.toggleTopShelfAutoCycle())
+        assertTrue(manager.isTopShelfAutoCycleEnabled)
     }
 
     @Test

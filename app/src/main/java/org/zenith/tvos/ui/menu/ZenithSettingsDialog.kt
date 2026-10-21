@@ -16,8 +16,9 @@ import org.zenith.tvos.core.settings.ZenithSettingsManager
 
 /**
  * Glassmorphic Zenith TV Preferences Modal.
- * Provides D-pad toggles for Wallpaper Theme, Tactile Audio, 60FPS Telemetry HUD,
- * Smart RAM Boost, Parental PIN Management, Ambient Screensaver timeout, and Hidden App restoration.
+ * Provides D-pad toggles for Wallpaper Theme, Top Shelf Showcase Carousel,
+ * Tactile Audio, 60FPS Telemetry HUD, Smart RAM Boost, Parental PIN Management,
+ * Ambient Screensaver timeout, and Hidden App restoration.
  */
 class ZenithSettingsDialog(
     context: Context,
@@ -38,6 +39,7 @@ class ZenithSettingsDialog(
         setContentView(R.layout.dialog_zenith_settings)
 
         val btnWallpaper = findViewById<Button>(R.id.btnSettingWallpaper)
+        val btnTopShelfCycle = findViewById<Button>(R.id.btnSettingTopShelfCycle)
         val btnSound = findViewById<Button>(R.id.btnSettingSound)
         val btnHud = findViewById<Button>(R.id.btnSettingHud)
         val btnRamBoost = findViewById<Button>(R.id.btnSmartRamBoost)
@@ -49,6 +51,7 @@ class ZenithSettingsDialog(
 
         fun refreshLabels() {
             btnWallpaper.text = "🎨 Wallpaper: ${settingsManager.wallpaperMode.displayName}"
+            btnTopShelfCycle.text = "🎬 Top Shelf Showcase Carousel: ${if (settingsManager.isTopShelfAutoCycleEnabled) "ON" else "OFF"}"
             btnSound.text = "🔊 Tactile Audio Clicks: ${if (settingsManager.isSoundEnabled) "ON" else "OFF"}"
             btnHud.text = "📊 60FPS & RAM Telemetry HUD: ${if (settingsManager.isHudOverlayEnabled) "ON" else "OFF"}"
             btnChangeParentalPin.text = "🔐 Change Parental PIN (${lockEngine.getLockedCount()} Locked)"
@@ -60,6 +63,7 @@ class ZenithSettingsDialog(
 
         val menuButtons = listOf(
             btnWallpaper,
+            btnTopShelfCycle,
             btnSound,
             btnHud,
             btnRamBoost,
@@ -82,6 +86,13 @@ class ZenithSettingsDialog(
 
         btnWallpaper.setOnClickListener {
             settingsManager.cycleWallpaperMode()
+            audioEngine.playSelectPop()
+            refreshLabels()
+            onSettingsChanged()
+        }
+
+        btnTopShelfCycle.setOnClickListener {
+            settingsManager.toggleTopShelfAutoCycle()
             audioEngine.playSelectPop()
             refreshLabels()
             onSettingsChanged()
