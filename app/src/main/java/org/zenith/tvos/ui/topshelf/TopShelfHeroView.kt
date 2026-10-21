@@ -10,6 +10,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import org.zenith.tvos.R
+import org.zenith.tvos.core.parallax.ParallaxBackdropEngine
 import org.zenith.tvos.core.recommendation.OfflineTopShelfContentEngine
 
 /**
@@ -227,5 +228,15 @@ class TopShelfHeroView @JvmOverloads constructor(
             .translationX(translationX)
             .setDuration(150L)
             .start()
+    }
+
+    /**
+     * Applies multi-plane 2.5D parallax depth across badge, title/synopsis, and action pill planes.
+     */
+    fun applyMultiPlaneParallax(offsets: ParallaxBackdropEngine.MultiPlaneOffsets) {
+        metaBadgeView.animate().translationX(offsets.badgeOffsetPx).setDuration(150L).start()
+        titleView.animate().translationX(offsets.titleOffsetPx).setDuration(150L).start()
+        synopsisView.animate().translationX(offsets.titleOffsetPx).setDuration(150L).start()
+        actionContainer.animate().translationX(offsets.actionOffsetPx).setDuration(150L).start()
     }
 }

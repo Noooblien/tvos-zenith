@@ -1,7 +1,6 @@
 package org.zenith.tvos.core
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.zenith.tvos.core.parallax.ParallaxBackdropEngine
 
@@ -26,7 +25,7 @@ class ParallaxBackdropEngineTest {
     }
 
     @Test
-    fun testComputeBackdropTranslation() {
+    fun testComputeBackdropTranslationAndMultiPlaneOffsets() {
         val engine = ParallaxBackdropEngine(maxTranslationPx = 40f)
 
         // Leftmost focus translates backdrop right (+40px)
@@ -37,6 +36,12 @@ class ParallaxBackdropEngineTest {
 
         // Rightmost focus translates backdrop left (-40px)
         assertEquals(-40f, engine.computeBackdropTranslationX(1.0f), 0.001f)
+
+        // Multi-plane offsets at ratio = -1.0f (base = +40f)
+        val planes = engine.computeMultiPlaneOffsets(-1.0f)
+        assertEquals(50.0f, planes.badgeOffsetPx, 0.001f)  // 40 * 1.25
+        assertEquals(40.0f, planes.titleOffsetPx, 0.001f)  // 40 * 1.00
+        assertEquals(26.0f, planes.actionOffsetPx, 0.001f) // 40 * 0.65
     }
 
     @Test

@@ -1,5 +1,6 @@
 package org.zenith.tvos.core
 
+import android.graphics.drawable.GradientDrawable
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Test
@@ -34,6 +35,26 @@ class DynamicWallpaperEngineTest {
         // Clamping check: < 0f -> black, > 1f -> white
         assertEquals(black, engine.interpolateColor(black, white, -0.5f))
         assertEquals(white, engine.interpolateColor(black, white, 1.5f))
+    }
+
+    @Test
+    fun testCrossfadeStopsAndParallaxOrientationResolution() {
+        val engine = DynamicWallpaperEngine()
+        val from = DynamicWallpaperEngine.Theme.MIDNIGHT_OBSIDIAN
+        val to = DynamicWallpaperEngine.Theme.COSMIC_AURORA
+
+        val stopsStart = engine.computeCrossfadeStops(from, to, 0.0f)
+        assertEquals(2, stopsStart.size)
+        assertEquals(engine.parseColorSafely(from.startColorHex), stopsStart[0])
+        assertEquals(engine.parseColorSafely(from.endColorHex), stopsStart[1])
+
+        val stopsEnd = engine.computeCrossfadeStops(from, to, 1.0f)
+        assertEquals(engine.parseColorSafely(to.startColorHex), stopsEnd[0])
+        assertEquals(engine.parseColorSafely(to.endColorHex), stopsEnd[1])
+
+        assertEquals(GradientDrawable.Orientation.TL_BR, engine.resolveParallaxOrientation(-0.8f))
+        assertEquals(GradientDrawable.Orientation.TOP_BOTTOM, engine.resolveParallaxOrientation(0.0f))
+        assertEquals(GradientDrawable.Orientation.TR_BL, engine.resolveParallaxOrientation(0.8f))
     }
 
     @Test

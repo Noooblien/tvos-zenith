@@ -1,23 +1,55 @@
 package org.zenith.tvos.core.wallpaper
 
-import android.graphics.Color
+import android.animation.ValueAnimator
 import android.graphics.drawable.GradientDrawable
+import android.view.View
 
 /**
- * Procedural Dynamic Wallpaper Engine generating Apple TV Aerial and Obsidian Glass
- * gradient meshes with zero disk I/O, zero network telemetry, and sub-millisecond shader synthesis.
+ * Dynamic ambient wallpaper generator for Zenith TV.
+ * Renders procedural multi-stop gradients, ambient color-lerped crossfades,
+ * and parallax-shifted gradient orientations without heavy 4K PNG/WebP bitmap memory bloat.
  */
 class DynamicWallpaperEngine {
 
-    /**
-     * Color themes inspired by tvOS 18 Aerials and Midnight Obsidian aesthetics.
-     */
-    enum class Theme(val startColorHex: String, val endColorHex: String, val displayName: String) {
-        MIDNIGHT_OBSIDIAN("#090C15", "#161D2E", "Midnight Obsidian"),
-        COSMIC_AURORA("#0B132B", "#1C2541", "Cosmic Aurora"),
-        DEEP_SPACE("#050811", "#1B1F3B", "Deep Space"),
-        SOLAR_ECLIPSE("#140D1B", "#2A1832", "Solar Eclipse"),
+    enum class Theme(
+        val startColorHex: String,
+        val endColorHex: String,
+        val displayName: String
+    ) {
+        MIDNIGHT_OBSIDIAN("#090C15", "#182032", "Midnight Obsidian"),
+        COSMIC_AURORA("#0F172A", "#1E1B4B", "Cosmic Aurora"),
+        SOLAR_ECLIPSE("#18181B", "#27272A", "Solar Eclipse"),
+        DEEP_SPACE("#05050A", "#121324", "Deep Space"),
         AERIAL_EARTH("#0A192F", "#172A45", "Aerial Earth")
+    }
+
+    /**
+     * Resolves a dynamic gradient orientation based on normalized horizontal scroll ratio [-1.0, 1.0]
+     * to simulate ambient studio light shifting across the backdrop as the user navigates the dock.
+     */
+    fun resolveParallaxOrientation(normalizedRatio: Float): GradientDrawable.Orientation {
+        return when {
+            normalizedRatio < -0.33f -> GradientDrawable.Orientation.TL_BR
+            normalizedRatio > 0.33f -> GradientDrawable.Orientation.TR_BL
+            else -> GradientDrawable.Orientation.TOP_BOTTOM
+        }
+    }
+
+    /**
+     * Computes a two-stop interpolated color pair `[startColor, endColor]` between [fromTheme] and [toTheme]
+     * at progress [fraction] in `[0.0, 1.0]`.
+     */
+    fun computeCrossfadeStops(fromTheme: Theme, toTheme: Theme, fraction: Float): IntArray {
+        val f = fraction.coerceIn(0f, 1f)
+        val startA = parseColorSafely(fromTheme.startColorHex)
+        val endA = parseColorSafely(fromTheme.endColorHex)
+        val startB = parseColorSafely(toTheme.startColorHex)
+        val endB = parseColorSafely(toTheme.endColorHex)
+
+        return intArrayOf(
+            interpolateColor(startA, startB, f),
+            interpolateColor(endA, endB, f)
+        )
     }
 
     /**
@@ -33,6 +65,36 @@ class DynamicWallpaperEngine {
         return GradientDrawable(orientation, intArrayOf(startColor, endColor)).apply {
             gradientType = GradientDrawable.LINEAR_GRADIENT
             setDither(true)
+        }
+    }
+
+    /**
+     * Smoothly crossfades the background of [targetView] from [fromTheme] to [toTheme]
+     * over [durationMs] while applying the parallax-resolved gradient orientation.
+     */
+    fun animateWallpaperCrossfade(
+        targetView: View,
+        fromTheme: Theme,
+        toTheme: Theme,
+        normalizedRatio: Float = 0f,
+        durationMs: Long = 260L
+    ) {
+        val orientation = resolveParallaxOrientation(normalizedRatio)
+        if (fromTheme == toTheme || durationMs <= 0L) {
+            targetView.background = createWallpaperDrawable(toTheme, orientation)
+            return
+        }
+
+        val drawable = createWallpaperDrawable(fromTheme, orientation)
+        targetView.background = drawable
+
+        ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = durationMs
+            addUpdateListener { anim ->
+                val fraction = anim.animatedValue as Float
+                drawable.colors = computeCrossfadeStops(fromTheme, toTheme, fraction)
+            }
+            start()
         }
     }
 

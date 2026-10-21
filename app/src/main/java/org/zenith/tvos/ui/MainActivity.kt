@@ -107,10 +107,11 @@ class MainActivity : Activity() {
     private var isViewingFavorites: Boolean = true
     private var isViewingRecent: Boolean = false
 
-    // Currently focused app tracker & Showcase Carousel slide index for Top Shelf
+    // Currently focused app tracker, Showcase Carousel slide index & active Wallpaper Theme
     private var currentFocusedApp: AppItem? = null
     private var currentFocusedPos: Int = 0
     private var currentHeroSlideIndex: Int = 0
+    private var activeWallpaperTheme: DynamicWallpaperEngine.Theme = DynamicWallpaperEngine.Theme.MIDNIGHT_OBSIDIAN
 
     // Interactive Remote Reorder State
     private var isReordering: Boolean = false
@@ -207,7 +208,7 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun applyCurrentWallpaper(category: AppCategory?) {
+    private fun applyCurrentWallpaper(category: AppCategory?, normalizedRatio: Float = 0f) {
         val theme = when (settingsManager.wallpaperMode) {
             WallpaperMode.DYNAMIC_CATEGORY -> {
                 if (category != null) {
@@ -221,7 +222,13 @@ class MainActivity : Activity() {
             WallpaperMode.DEEP_OCEAN -> DynamicWallpaperEngine.Theme.AERIAL_EARTH
             WallpaperMode.SOLAR_NEBULA -> DynamicWallpaperEngine.Theme.SOLAR_ECLIPSE
         }
-        rootContainer.background = wallpaperEngine.createWallpaperDrawable(theme)
+        wallpaperEngine.animateWallpaperCrossfade(
+            targetView = rootContainer,
+            fromTheme = activeWallpaperTheme,
+            toTheme = theme,
+            normalizedRatio = normalizedRatio
+        )
+        activeWallpaperTheme = theme
     }
 
     private fun initUtilityButtons() {
@@ -614,13 +621,13 @@ class MainActivity : Activity() {
                         mainHandler.postDelayed(topShelfCarouselRunnable, 6_000L)
                     }
 
-                    // Apple TV Dynamic 2.5D Parallax Shift (Internal content translation)
+                    // Apple TV Multi-Plane 2.5D Parallax Shift
                     val ratio = parallaxEngine.computeNormalizedRatio(position, displayedApps.size)
-                    val transX = parallaxEngine.computeBackdropTranslationX(ratio)
-                    topShelfHero.applyParallax(transX)
+                    val planeOffsets = parallaxEngine.computeMultiPlaneOffsets(ratio)
+                    topShelfHero.applyMultiPlaneParallax(planeOffsets)
 
-                    // Apply selected or dynamic category wallpaper
-                    applyCurrentWallpaper(item.category)
+                    // Apply selected or dynamic category wallpaper with parallax orientation
+                    applyCurrentWallpaper(item.category, ratio)
                 }
             },
             onAppClicked = { item ->
