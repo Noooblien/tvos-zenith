@@ -18,6 +18,7 @@ class ZenithRemoteServerTest {
     @Test
     fun testKeyMapping() {
         assertEquals(KeyEvent.KEYCODE_DPAD_UP, ZenithRemoteServer.mapKey("UP"))
+        assertEquals(KeyEvent.KEYCODE_DPAD_UP, ZenithRemoteServer.mapKey("up"))
         assertEquals(KeyEvent.KEYCODE_DPAD_DOWN, ZenithRemoteServer.mapKey("DOWN"))
         assertEquals(KeyEvent.KEYCODE_DPAD_LEFT, ZenithRemoteServer.mapKey("LEFT"))
         assertEquals(KeyEvent.KEYCODE_DPAD_RIGHT, ZenithRemoteServer.mapKey("RIGHT"))
@@ -66,12 +67,13 @@ class ZenithRemoteServerTest {
     }
 
     @Test
-    fun testServerLifecycleAndHttpDispatch() {
-        val testPort = 19528
+    fun testServerLifecycleAndHttpDispatchAndOwaspValidation() {
+        val testPort = 19529
         val server = ZenithRemoteServer(port = testPort)
 
         var receivedKey: Int? = null
         var launchedPkg: String? = null
+        var receivedText: String? = null
         val latch = CountDownLatch(1)
 
         server.onKeyReceived = { keyCode ->
@@ -84,6 +86,9 @@ class ZenithRemoteServerTest {
         server.onLaunchPackageRequested = { pkg ->
             launchedPkg = pkg
             pkg == "com.plexapp.android"
+        }
+        server.onTextReceived = { text ->
+            receivedText = text
         }
 
         val started = server.start()
@@ -117,6 +122,15 @@ class ZenithRemoteServerTest {
             val launchConn = URL("http://127.0.0.1:$testPort/api/launch?pkg=com.plexapp.android").openConnection() as HttpURLConnection
             assertEquals(200, launchConn.responseCode)
             assertEquals("com.plexapp.android", launchedPkg)
+
+            // 4. Test OWASP rejection of malformed/malicious package name
+            val badLaunchConn = URL("http://127.0.0.1:$testPort/api/launch?pkg=evil%3Brm").openConnection() as HttpURLConnection
+            assertEquals(400, badLaunchConn.responseCode)
+
+            // 5. Test /api/type with control characters stripped
+            val typeConn = URL("http://127.0.0.1:$testPort/api/type?text=YouTube%00%20TV").openConnection() as HttpURLConnection
+            assertEquals(200, typeConn.responseCode)
+            assertEquals("YouTube TV", receivedText)
         } finally {
             server.stop()
         }

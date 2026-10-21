@@ -1,6 +1,7 @@
 package org.zenith.tvos.core.remote
 
 import android.view.KeyEvent
+import org.zenith.tvos.core.security.IntentSanitizer
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.OutputStream
@@ -72,8 +73,14 @@ class ZenithRemoteServer(
     private fun handleClient(client: Socket) {
         try {
             client.use { socket ->
-                val reader = BufferedReader(InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8))
+                socket.soTimeout = 3000
+                val remoteIp = socket.inetAddress?.hostAddress
                 val output = socket.getOutputStream()
+                if (!IntentSanitizer.isPrivateOrLoopbackIpv4(remoteIp)) {
+                    sendResponse(output, 403, "Forbidden", "application/json", "{\"error\":\"non-private client ip rejected\"}")
+                    return
+                }
+                val reader = BufferedReader(InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8))
 
                 val requestLine = reader.readLine() ?: return
                 val parts = requestLine.split(" ")
@@ -93,6 +100,11 @@ class ZenithRemoteServer(
                         contentLength = line.substringAfter(":").trim().toIntOrNull() ?: 0
                     }
                     line = reader.readLine()
+                }
+
+                if (contentLength > MAX_REQUEST_BODY_BYTES) {
+                    sendResponse(output, 413, "Payload Too Large", "application/json", "{\"error\":\"request body exceeds 2048 byte limit\"}")
+                    return
                 }
 
                 var body = ""
@@ -128,6 +140,10 @@ class ZenithRemoteServer(
                         val queryParams = parseQueryParams(queryString)
                         val pkg = queryParams["pkg"]?.trim() ?: ""
                         if (pkg.isNotEmpty()) {
+                            if (!IntentSanitizer.isValidPackageName(pkg)) {
+                                sendResponse(output, 400, "Bad Request", "application/json", "{\"error\":\"invalid package format\"}")
+                                return
+                            }
                             val accepted = onLaunchPackageRequested?.invoke(pkg) ?: false
                             if (accepted) {
                                 sendResponse(output, 200, "OK", "application/json", "{\"status\":\"ok\",\"launched\":\"${escapeJson(pkg)}\"}")
@@ -156,9 +172,10 @@ class ZenithRemoteServer(
                             val bodyParams = parseQueryParams(body)
                             text = bodyParams["text"] ?: body
                         }
-                        if (!text.isNullOrEmpty()) {
-                            onTextReceived?.invoke(text)
-                            sendResponse(output, 200, "OK", "application/json", "{\"status\":\"ok\",\"typed\":\"${escapeJson(text)}\"}")
+                        val sanitizedText = IntentSanitizer.sanitizeSearchQuery(text)
+                        if (sanitizedText.isNotEmpty()) {
+                            onTextReceived?.invoke(sanitizedText)
+                            sendResponse(output, 200, "OK", "application/json", "{\"status\":\"ok\",\"typed\":\"${escapeJson(sanitizedText)}\"}")
                         } else {
                             sendResponse(output, 400, "Bad Request", "application/json", "{\"error\":\"missing text parameter\"}")
                         }
@@ -191,6 +208,7 @@ class ZenithRemoteServer(
 
     companion object {
         const val DEFAULT_PORT = 8080
+        const val MAX_REQUEST_BODY_BYTES = 2048
 
         fun escapeJson(value: String): String {
             return value
