@@ -583,6 +583,8 @@ class MainActivity : Activity() {
     }
 
     private fun updateDisplayedApps() {
+        iconCache.setPinnedKeys(libraryManager.getFavorites().map { it.packageName })
+
         val apps = when {
             isViewingFavorites -> libraryManager.getFavorites()
             isViewingRecent -> libraryManager.getRecentApps().ifEmpty { libraryManager.getFavorites() }

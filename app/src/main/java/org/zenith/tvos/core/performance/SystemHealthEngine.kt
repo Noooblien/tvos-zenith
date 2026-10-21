@@ -5,8 +5,8 @@ import java.util.Locale
 
 /**
  * Real-time System Health & Memory Telemetry Engine for Zenith TV.
- * Monitors JVM/ART heap footprint, UltraLightIconCache utilization against its 12MB ceiling,
- * and FramePacer VSYNC stability. Can also execute an instant Smart RAM Boost (cache trim + GC).
+ * Monitors JVM/ART heap footprint, UltraLightIconCache utilization & hit rate against its 12MB ceiling,
+ * and FramePacer VSYNC stability. Can also execute an instant Smart RAM Boost (pinned-aware cache trim + GC).
  */
 class SystemHealthEngine(
     private val framePacer: FramePacer,
@@ -25,13 +25,14 @@ class SystemHealthEngine(
         val heapUsedKb: Long,
         val heapMaxKb: Long,
         val iconCacheUsedKb: Int,
-        val iconCacheEntries: Int
+        val iconCacheEntries: Int,
+        val iconCacheHitRatePercent: Int = 100
     ) {
         fun formatHudLine(): String {
             val heapMb = String.format(Locale.US, "%.1f", heapUsedKb / 1024.0)
             val cacheKb = iconCacheUsedKb
             val frameMs = String.format(Locale.US, "%.1f", avgFrameTimeMs)
-            return "⚡ ${fps} FPS (${frameMs}ms)  •  🧠 Heap: ${heapMb} MB  •  🖼️ IconCache: ${cacheKb} KB (${iconCacheEntries} icons)  •  Jank: ${droppedFrames}"
+            return "⚡ ${fps} FPS (${frameMs}ms)  •  🧠 Heap: ${heapMb} MB  •  🖼️ IconCache: ${cacheKb} KB (${iconCacheEntries} icons, ${iconCacheHitRatePercent}% hit)  •  Jank: ${droppedFrames}"
         }
     }
 
@@ -50,6 +51,11 @@ class SystemHealthEngine(
         } catch (e: Exception) {
             0
         }
+        val hitRate = try {
+            iconCache.hitRatePercent()
+        } catch (e: Exception) {
+            100
+        }
 
         return HealthSnapshot(
             fps = framePacer.getCurrentFps(),
@@ -58,13 +64,14 @@ class SystemHealthEngine(
             heapUsedKb = (usedBytes / 1024L).coerceAtLeast(0L),
             heapMaxKb = (maxBytes / 1024L).coerceAtLeast(1L),
             iconCacheUsedKb = (cacheBytes / 1024).coerceAtLeast(0),
-            iconCacheEntries = cacheEntries.coerceAtLeast(0)
+            iconCacheEntries = cacheEntries.coerceAtLeast(0),
+            iconCacheHitRatePercent = hitRate
         )
     }
 
     /**
-     * Executes an immediate memory optimization pass: trims non-essential LruCache bitmaps
-     * and requests ART/Dalvik garbage collection.
+     * Executes an immediate memory optimization pass: trims non-essential (unpinned) LruCache bitmaps
+     * while preserving pinned Favorites Dock icons, and requests ART/Dalvik garbage collection.
      * @return estimated bytes reclaimed or trimmed.
      */
     fun performSmartRamBoost(): Long {
