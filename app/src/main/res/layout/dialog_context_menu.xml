@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/contextMenuRoot"
+    android:layout_width="380dp"
+    android:layout_height="wrap_content"
+    android:layout_gravity="center"
+    android:background="@drawable/bg_context_menu"
+    android:orientation="vertical"
+    android:padding="28dp">
+
+    <!-- Header: Icon, Label, Category -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:layout_marginBottom="20dp">
+
+        <ImageView
+            android:id="@+id/menuAppIcon"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:contentDescription="@null"
+            android:src="@drawable/ic_tvos_logo" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/menuAppTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/tvos_text_primary"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/menuAppMeta"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:textColor="@color/tvos_accent_cyan"
+                android:textSize="12sp"
+                android:fontFamily="sans-serif-medium" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#26FFFFFF"
+        android:layout_marginBottom="16dp" />
+
+    <!-- Action Buttons -->
+    <Button
+        android:id="@+id/btnTogglePin"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginBottom="8dp"
+        android:background="@drawable/bg_menu_item"
+        android:focusable="true"
+        android:gravity="start|center_vertical"
+        android:paddingHorizontal="16dp"
+        android:text="📌 Pin to Favorites"
+        android:textAllCaps="false"
+        android:textColor="@color/tvos_text_primary"
+        android:textSize="15sp" />
+
+    <Button
+        android:id="@+id/btnReorder"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginBottom="8dp"
+        android:background="@drawable/bg_menu_item"
+        android:focusable="true"
+        android:gravity="start|center_vertical"
+        android:paddingHorizontal="16dp"
+        android:text="⇄ Move App"
+        android:textAllCaps="false"
+        android:textColor="@color/tvos_text_primary"
+        android:textSize="15sp" />
+
+    <Button
+        android:id="@+id/btnAppInfo"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginBottom="8dp"
+        android:background="@drawable/bg_menu_item"
+        android:focusable="true"
+        android:gravity="start|center_vertical"
+        android:paddingHorizontal="16dp"
+        android:text="ℹ️ App Info"
+        android:textAllCaps="false"
+        android:textColor="@color/tvos_text_primary"
+        android:textSize="15sp" />
+
+    <Button
+        android:id="@+id/btnHideApp"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginBottom="8dp"
+        android:background="@drawable/bg_menu_item"
+        android:focusable="true"
+        android:gravity="start|center_vertical"
+        android:paddingHorizontal="16dp"
+        android:text="👁️ Hide App"
+        android:textAllCaps="false"
+        android:textColor="@color/tvos_text_primary"
+        android:textSize="15sp" />
+
+    <Button
+        android:id="@+id/btnUninstall"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginBottom="8dp"
+        android:background="@drawable/bg_menu_item"
+        android:focusable="true"
+        android:gravity="start|center_vertical"
+        android:paddingHorizontal="16dp"
+        android:text="🗑️ Uninstall"
+        android:textAllCaps="false"
+        android:textColor="#FF453A"
+        android:textSize="15sp" />
+
+</LinearLayout>

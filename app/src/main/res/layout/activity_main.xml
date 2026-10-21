@@ -11,39 +11,151 @@
     <org.zenith.tvos.ui.topshelf.TopShelfHeroView
         android:id="@+id/topShelfHero"
         android:layout_width="match_parent"
-        android:layout_height="320dp"
+        android:layout_height="270dp"
         android:layout_alignParentTop="true"
         android:layout_marginHorizontal="48dp"
-        android:layout_marginTop="24dp"
+        android:layout_marginTop="20dp"
         android:clipChildren="false" />
 
-    <!-- Current Focused App Title Label -->
+    <!-- tvOS Category Filter Pills Bar -->
+    <HorizontalScrollView
+        android:id="@+id/categoryPillsScroll"
+        android:layout_width="match_parent"
+        android:layout_height="38dp"
+        android:layout_below="@id/topShelfHero"
+        android:layout_marginHorizontal="48dp"
+        android:layout_marginTop="10dp"
+        android:scrollbars="none"
+        android:overScrollMode="never">
+
+        <LinearLayout
+            android:id="@+id/categoryPillsLayout"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/pillFavorites"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:layout_marginEnd="10dp"
+                android:background="@drawable/bg_category_pill"
+                android:focusable="true"
+                android:paddingHorizontal="16dp"
+                android:text="⭐ Favorites"
+                android:textAllCaps="false"
+                android:textColor="@color/tvos_text_primary"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/pillAll"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:layout_marginEnd="10dp"
+                android:background="@drawable/bg_category_pill"
+                android:focusable="true"
+                android:paddingHorizontal="16dp"
+                android:text="All Apps"
+                android:textAllCaps="false"
+                android:textColor="@color/tvos_text_primary"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/pillStreaming"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:layout_marginEnd="10dp"
+                android:background="@drawable/bg_category_pill"
+                android:focusable="true"
+                android:paddingHorizontal="16dp"
+                android:text="Streaming"
+                android:textAllCaps="false"
+                android:textColor="@color/tvos_text_primary"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/pillMusic"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:layout_marginEnd="10dp"
+                android:background="@drawable/bg_category_pill"
+                android:focusable="true"
+                android:paddingHorizontal="16dp"
+                android:text="Music"
+                android:textAllCaps="false"
+                android:textColor="@color/tvos_text_primary"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/pillGaming"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:layout_marginEnd="10dp"
+                android:background="@drawable/bg_category_pill"
+                android:focusable="true"
+                android:paddingHorizontal="16dp"
+                android:text="Games"
+                android:textAllCaps="false"
+                android:textColor="@color/tvos_text_primary"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/pillTools"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:layout_marginEnd="10dp"
+                android:background="@drawable/bg_category_pill"
+                android:focusable="true"
+                android:paddingHorizontal="16dp"
+                android:text="Tools"
+                android:textAllCaps="false"
+                android:textColor="@color/tvos_text_primary"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/pillSystem"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:layout_marginEnd="10dp"
+                android:background="@drawable/bg_category_pill"
+                android:focusable="true"
+                android:paddingHorizontal="16dp"
+                android:text="System"
+                android:textAllCaps="false"
+                android:textColor="@color/tvos_text_primary"
+                android:textSize="13sp" />
+
+        </LinearLayout>
+    </HorizontalScrollView>
+
+    <!-- Focused App Title / Reorder Status Indicator -->
     <TextView
         android:id="@+id/focusedAppName"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_above="@id/dockContainer"
         android:layout_centerHorizontal="true"
-        android:layout_marginBottom="12dp"
+        android:layout_marginBottom="8dp"
         android:fontFamily="sans-serif-medium"
         android:text=""
         android:textColor="@color/tvos_text_primary"
-        android:textSize="18sp"
+        android:textSize="16sp"
         android:alpha="0.9" />
 
-    <!-- Frosted Bottom Dock Container -->
+    <!-- Frosted Bottom Dock / App Drawer Container -->
     <FrameLayout
         android:id="@+id/dockContainer"
         android:layout_width="match_parent"
-        android:layout_height="130dp"
+        android:layout_height="140dp"
         android:layout_alignParentBottom="true"
         android:layout_marginHorizontal="36dp"
-        android:layout_marginBottom="28dp"
+        android:layout_marginBottom="20dp"
         android:background="@drawable/bg_frosted_dock"
         android:clipChildren="false"
         android:clipToPadding="false"
-        android:paddingHorizontal="24dp"
-        android:paddingVertical="8dp">
+        android:paddingHorizontal="20dp"
+        android:paddingVertical="6dp">
 
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/appRecyclerView"

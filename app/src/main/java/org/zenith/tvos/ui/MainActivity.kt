@@ -4,24 +4,28 @@ import android.app.Activity
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ApplicationInfo
-import android.content.pm.PackageManager
-import android.content.pm.ResolveInfo
+import android.graphics.Color
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
+import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.zenith.tvos.R
 import org.zenith.tvos.core.cache.UltraLightIconCache
 import org.zenith.tvos.core.focus.SpatialFocusEngine
 import org.zenith.tvos.core.input.DPadDebounceDispatcher
+import org.zenith.tvos.core.library.AppLibraryManager
+import org.zenith.tvos.core.library.SharedPreferencesAppStorage
+import org.zenith.tvos.core.menu.AppContextMenuEngine
 import org.zenith.tvos.core.parallax.ParallaxBackdropEngine
 import org.zenith.tvos.core.performance.FramePacer
 import org.zenith.tvos.core.recommendation.OfflineTopShelfContentEngine
@@ -32,44 +36,68 @@ import org.zenith.tvos.ui.dock.AppCategory
 import org.zenith.tvos.ui.dock.AppCategoryClassifier
 import org.zenith.tvos.ui.dock.AppDockAdapter
 import org.zenith.tvos.ui.dock.AppItem
+import org.zenith.tvos.ui.menu.AppContextMenuDialog
 import org.zenith.tvos.ui.topshelf.TopShelfHeroView
 
 /**
- * High-performance, ad-free Apple TV tvOS launcher activity.
+ * Flagship tvOS Zenith Main Launcher Activity.
  *
- * Engineered specifically for legacy hardware (Amlogic S905, 1GB RAM) with:
+ * Core Architecture & Guarantees:
  * - < 120ms cold boot
  * - Zero background analytics or ad SDKs
  * - Strict 18MB PSS RAM ceiling
- * - Solid 60 FPS D-pad navigation with Spring Physics, Parallax, Procedural Wallpapers, D-Pad Debouncing & Offline Top Shelf Engine
+ * - Solid 60 FPS D-pad navigation with Spring Physics, Parallax, Procedural Wallpapers & D-Pad Debouncing
+ * - Air-gapped Offline Top Shelf dynamic content resolution
+ * - Categorized App Drawer Grid & interactive long-press Context Menu with D-pad reordering
  */
 class MainActivity : Activity() {
 
-    private val scope = CoroutineScope(Dispatchers.Main + Job())
-    private val iconCache = UltraLightIconCache()
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val iconCache = UltraLightIconCache(maxCacheBytes = 12 * 1024 * 1024)
     private val focusEngine = SpatialFocusEngine(useSpringPhysics = true)
     private val parallaxEngine = ParallaxBackdropEngine()
     private val wallpaperEngine = DynamicWallpaperEngine()
     private val topShelfEngine = OfflineTopShelfContentEngine()
     private val dPadDebouncer = DPadDebounceDispatcher()
     private val framePacer = FramePacer()
+    private val menuEngine = AppContextMenuEngine()
 
+    private lateinit var libraryManager: AppLibraryManager
     private lateinit var rootContainer: View
     private lateinit var topShelfHero: TopShelfHeroView
     private lateinit var focusedAppName: TextView
     private lateinit var appRecyclerView: RecyclerView
     private var packageReceiver: PackageChangeReceiver? = null
 
-    private val appList = mutableListOf<AppItem>()
+    private val displayedApps = mutableListOf<AppItem>()
+    private var currentCategoryFilter: AppCategory? = null
+    private var isViewingFavorites: Boolean = true
+
+    // Interactive Remote Reorder State
+    private var isReordering: Boolean = false
+    private var reorderCurrentPos: Int = -1
+
+    // Category Pill Buttons
+    private lateinit var pillFavorites: Button
+    private lateinit var pillAll: Button
+    private lateinit var pillStreaming: Button
+    private lateinit var pillMusic: Button
+    private lateinit var pillGaming: Button
+    private lateinit var pillTools: Button
+    private lateinit var pillSystem: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        libraryManager = AppLibraryManager(SharedPreferencesAppStorage(this))
+
         rootContainer = findViewById(R.id.rootContainer)
         topShelfHero = findViewById(R.id.topShelfHero)
         focusedAppName = findViewById(R.id.focusedAppName)
         appRecyclerView = findViewById(R.id.appRecyclerView)
+
+        initCategoryPills()
 
         // Apply default Midnight Obsidian backdrop
         rootContainer.background = wallpaperEngine.createWallpaperDrawable(DynamicWallpaperEngine.Theme.MIDNIGHT_OBSIDIAN)
@@ -77,6 +105,52 @@ class MainActivity : Activity() {
         setupRecyclerView()
         loadInstalledApps()
         registerPackageReceiver()
+    }
+
+    private fun initCategoryPills() {
+        pillFavorites = findViewById(R.id.pillFavorites)
+        pillAll = findViewById(R.id.pillAll)
+        pillStreaming = findViewById(R.id.pillStreaming)
+        pillMusic = findViewById(R.id.pillMusic)
+        pillGaming = findViewById(R.id.pillGaming)
+        pillTools = findViewById(R.id.pillTools)
+        pillSystem = findViewById(R.id.pillSystem)
+
+        val pills = listOf(
+            pillFavorites to { filterFavorites() },
+            pillAll to { filterCategory(null) },
+            pillStreaming to { filterCategory(AppCategory.STREAMING) },
+            pillMusic to { filterCategory(AppCategory.MUSIC) },
+            pillGaming to { filterCategory(AppCategory.GAMING) },
+            pillTools to { filterCategory(AppCategory.TOOLS) },
+            pillSystem to { filterCategory(AppCategory.SYSTEM) }
+        )
+
+        for ((pill, action) in pills) {
+            pill.setOnClickListener {
+                resetPillSelection()
+                pill.isSelected = true
+                action()
+            }
+            pill.setOnFocusChangeListener { _, hasFocus ->
+                if (hasFocus) {
+                    pill.setTextColor(Color.BLACK)
+                } else {
+                    pill.setTextColor(Color.parseColor("#F5F5F7"))
+                }
+            }
+        }
+        pillFavorites.isSelected = true
+    }
+
+    private fun resetPillSelection() {
+        pillFavorites.isSelected = false
+        pillAll.isSelected = false
+        pillStreaming.isSelected = false
+        pillMusic.isSelected = false
+        pillGaming.isSelected = false
+        pillTools.isSelected = false
+        pillSystem.isSelected = false
     }
 
     override fun onResume() {
@@ -94,6 +168,7 @@ class MainActivity : Activity() {
         super.onDestroy()
         packageReceiver?.let { unregisterReceiver(it) }
         iconCache.evictAll()
+        scope.cancel()
     }
 
     override fun onTrimMemory(level: Int) {
@@ -102,7 +177,6 @@ class MainActivity : Activity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        // Drop noisy jitter or flooding D-pad repeat events on low-spec chips
         if (!dPadDebouncer.shouldDispatchKeyEvent(event)) {
             return true
         }
@@ -112,7 +186,6 @@ class MainActivity : Activity() {
     private fun setupRecyclerView() {
         appRecyclerView.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         appRecyclerView.setHasFixedSize(true)
-        // Optimize item caching for 60fps horizontal scrolling
         appRecyclerView.setItemViewCacheSize(10)
     }
 
@@ -121,13 +194,40 @@ class MainActivity : Activity() {
             val apps = withContext(Dispatchers.IO) {
                 queryInstalledTvApps()
             }
-            appList.clear()
-            appList.addAll(apps)
+            libraryManager.setInstalledApps(apps)
+            updateDisplayedApps()
+        }
+    }
 
-            val adapter = AppDockAdapter(
-                apps = appList,
-                focusEngine = focusEngine,
-                onAppFocused = { item, position ->
+    private fun filterFavorites() {
+        if (isReordering) commitReorder()
+        isViewingFavorites = true
+        currentCategoryFilter = null
+        updateDisplayedApps()
+    }
+
+    private fun filterCategory(category: AppCategory?) {
+        if (isReordering) commitReorder()
+        isViewingFavorites = false
+        currentCategoryFilter = category
+        updateDisplayedApps()
+    }
+
+    private fun updateDisplayedApps() {
+        val apps = if (isViewingFavorites) {
+            libraryManager.getFavorites()
+        } else {
+            libraryManager.getFilteredApps(currentCategoryFilter)
+        }
+
+        displayedApps.clear()
+        displayedApps.addAll(apps)
+
+        val adapter = AppDockAdapter(
+            apps = displayedApps,
+            focusEngine = focusEngine,
+            onAppFocused = { item, position ->
+                if (!isReordering) {
                     focusedAppName.text = item.label
 
                     // Offline contextual Top Shelf content resolution
@@ -135,38 +235,164 @@ class MainActivity : Activity() {
                     topShelfHero.updateHero(heroContent)
 
                     // Apple TV Dynamic 2.5D Parallax Shift
-                    val ratio = parallaxEngine.computeNormalizedRatio(position, appList.size)
+                    val ratio = parallaxEngine.computeNormalizedRatio(position, displayedApps.size)
                     val transX = parallaxEngine.computeBackdropTranslationX(ratio)
                     topShelfHero.applyParallax(transX)
 
                     // Procedural Dynamic Wallpaper Shift per App Category
                     val theme = wallpaperEngine.getThemeForCategory(item.category.name)
                     rootContainer.background = wallpaperEngine.createWallpaperDrawable(theme)
-                },
-                onAppClicked = { item ->
+                }
+            },
+            onAppClicked = { item ->
+                if (isReordering) {
+                    commitReorder()
+                } else {
                     launchAppSafely(item)
                 }
-            )
-            appRecyclerView.adapter = adapter
+            },
+            onAppLongClicked = { item, position ->
+                if (!isReordering) {
+                    showContextMenu(item, position)
+                }
+            }
+        )
+        appRecyclerView.adapter = adapter
 
-            if (appList.isNotEmpty()) {
-                val first = appList[0]
-                focusedAppName.text = first.label
-                val heroContent = topShelfEngine.resolveContent(first)
-                topShelfHero.updateHero(heroContent)
+        if (displayedApps.isNotEmpty()) {
+            val first = displayedApps[0]
+            focusedAppName.text = first.label
+            val heroContent = topShelfEngine.resolveContent(first)
+            topShelfHero.updateHero(heroContent)
+        } else {
+            focusedAppName.text = "No applications in this category"
+        }
+    }
+
+    private fun showContextMenu(item: AppItem, position: Int) {
+        val isPinned = libraryManager.isFavorite(item.packageName)
+        val dialog = AppContextMenuDialog(
+            context = this,
+            appItem = item,
+            isPinned = isPinned,
+            focusEngine = focusEngine,
+            onTogglePin = { app ->
+                if (isPinned) {
+                    libraryManager.removeFromFavorites(app.packageName)
+                    Toast.makeText(this, "Removed ${app.label} from Favorites", Toast.LENGTH_SHORT).show()
+                } else {
+                    libraryManager.pinToFavorites(app.packageName)
+                    Toast.makeText(this, "Pinned ${app.label} to Favorites", Toast.LENGTH_SHORT).show()
+                }
+                updateDisplayedApps()
+            },
+            onReorder = { _ ->
+                startReorder(position)
+            },
+            onAppInfo = { app ->
+                val intent = menuEngine.createAppInfoIntent(app.packageName)
+                if (intent != null) {
+                    try {
+                        startActivity(intent)
+                    } catch (e: Exception) {
+                        Toast.makeText(this, "Cannot open App Info", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            },
+            onHideApp = { app ->
+                libraryManager.hideApp(app.packageName)
+                Toast.makeText(this, "Hidden ${app.label} from Home", Toast.LENGTH_SHORT).show()
+                updateDisplayedApps()
+            },
+            onUninstall = { app ->
+                val intent = menuEngine.createUninstallIntent(app.packageName, app.isSystemApp)
+                if (intent != null) {
+                    try {
+                        startActivity(intent)
+                    } catch (e: Exception) {
+                        Toast.makeText(this, "Cannot prompt uninstall", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        )
+        dialog.show()
+    }
+
+    private fun startReorder(position: Int) {
+        isReordering = true
+        reorderCurrentPos = position
+        focusedAppName.text = "⇄ REORDERING: D-Pad ◀/▶ to move, Center/Back to confirm"
+        val adapter = appRecyclerView.adapter as? AppDockAdapter
+        adapter?.setReorderMode(true, position)
+    }
+
+    private fun commitReorder() {
+        if (!isReordering) return
+        isReordering = false
+        val adapter = appRecyclerView.adapter as? AppDockAdapter
+        adapter?.setReorderMode(false)
+        if (reorderCurrentPos in displayedApps.indices) {
+            focusedAppName.text = displayedApps[reorderCurrentPos].label
+        }
+        reorderCurrentPos = -1
+        Toast.makeText(this, "Layout arrangement saved", Toast.LENGTH_SHORT).show()
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (isReordering) {
+            when (keyCode) {
+                KeyEvent.KEYCODE_DPAD_LEFT -> {
+                    if (reorderCurrentPos > 0) {
+                        val targetPos = reorderCurrentPos - 1
+                        if (isViewingFavorites) {
+                            libraryManager.moveFavorite(reorderCurrentPos, targetPos)
+                        }
+                        val adapter = appRecyclerView.adapter as? AppDockAdapter
+                        adapter?.swapItems(reorderCurrentPos, targetPos)
+                        reorderCurrentPos = targetPos
+                        appRecyclerView.scrollToPosition(targetPos)
+                    }
+                    return true
+                }
+                KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                    if (reorderCurrentPos < displayedApps.size - 1) {
+                        val targetPos = reorderCurrentPos + 1
+                        if (isViewingFavorites) {
+                            libraryManager.moveFavorite(reorderCurrentPos, targetPos)
+                        }
+                        val adapter = appRecyclerView.adapter as? AppDockAdapter
+                        adapter?.swapItems(reorderCurrentPos, targetPos)
+                        reorderCurrentPos = targetPos
+                        appRecyclerView.scrollToPosition(targetPos)
+                    }
+                    return true
+                }
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_BACK -> {
+                    commitReorder()
+                    return true
+                }
             }
         }
+
+        // Intercept back key to prevent launcher destruction
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
+            if (!isViewingFavorites) {
+                filterFavorites()
+                pillFavorites.requestFocus()
+                return true
+            }
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
     }
 
     private fun queryInstalledTvApps(): List<AppItem> {
         val pm = packageManager
         val items = mutableListOf<AppItem>()
 
-        // 1. Try Leanback Launcher Apps
         val tvIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER)
         var resolveList = pm.queryIntentActivities(tvIntent, 0)
 
-        // 2. If no Leanback apps, fallback to standard launcher apps
         if (resolveList.isEmpty()) {
             val standardIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
             resolveList = pm.queryIntentActivities(standardIntent, 0)
@@ -176,7 +402,6 @@ class MainActivity : Activity() {
             val pkg = resolveInfo.activityInfo.packageName
             val cls = resolveInfo.activityInfo.name
 
-            // Exclude self from launcher list
             if (pkg == packageName) continue
 
             val label = resolveInfo.loadLabel(pm).toString()
@@ -202,7 +427,6 @@ class MainActivity : Activity() {
             )
         }
 
-        // Add mock showcase defaults if running on bare AVD or fresh TV
         if (items.isEmpty()) {
             items.addAll(getShowcaseMockApps())
         }
@@ -250,13 +474,5 @@ class MainActivity : Activity() {
             AppItem("com.android.tv.settings", "com.android.tv.settings.MainSettings", "Settings", isSystemApp = true, category = AppCategory.SYSTEM),
             AppItem("com.lonelycatgames.Xplore", "com.lonelycatgames.Xplore.MainActivity", "Files", category = AppCategory.TOOLS)
         )
-    }
-
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        // Intercept back key to prevent launcher destruction
-        if (keyCode == KeyEvent.KEYCODE_BACK) {
-            return true
-        }
-        return super.onKeyDown(keyCode, event)
     }
 }
