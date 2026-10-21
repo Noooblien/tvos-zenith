@@ -15,6 +15,7 @@ class AppLibraryManagerTest {
     private class MockStorage : AppPreferencesStorage {
         var savedFavorites: List<String>? = null
         var savedHidden: Set<String>? = null
+        var savedRecents: List<String>? = null
 
         override fun saveFavorites(packageNames: List<String>) {
             savedFavorites = ArrayList(packageNames)
@@ -27,6 +28,12 @@ class AppLibraryManagerTest {
         }
 
         override fun loadHidden(): Set<String>? = savedHidden
+
+        override fun saveRecentLaunches(packageNames: List<String>) {
+            savedRecents = ArrayList(packageNames)
+        }
+
+        override fun loadRecentLaunches(): List<String>? = savedRecents
     }
 
     private lateinit var storage: MockStorage
@@ -126,6 +133,28 @@ class AppLibraryManagerTest {
         manager.unhideApp("com.netflix.ninja")
         assertFalse(manager.isHidden("com.netflix.ninja"))
         assertTrue(manager.getFavorites().any { it.packageName == "com.netflix.ninja" })
+    }
+
+    @Test
+    fun testMruRecentLaunchesTracking() {
+        manager.setInstalledApps(sampleApps)
+        assertTrue(manager.getRecentApps().isEmpty())
+
+        manager.recordAppLaunch("com.spotify.tv.android")
+        manager.recordAppLaunch("org.videolan.vlc")
+        manager.recordAppLaunch("com.netflix.ninja")
+
+        var recents = manager.getRecentApps()
+        assertEquals(listOf("Netflix", "VLC", "Spotify"), recents.map { it.label })
+
+        // Re-launching Spotify promotes it to index 0 without duplication
+        manager.recordAppLaunch("com.spotify.tv.android")
+        recents = manager.getRecentApps()
+        assertEquals(listOf("Spotify", "Netflix", "VLC"), recents.map { it.label })
+
+        // Hiding an app excludes it from recent apps
+        manager.hideApp("com.netflix.ninja")
+        assertEquals(listOf("Spotify", "VLC"), manager.getRecentApps().map { it.label })
     }
 
     @Test

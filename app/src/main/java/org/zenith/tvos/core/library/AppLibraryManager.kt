@@ -4,7 +4,7 @@ import org.zenith.tvos.ui.dock.AppCategory
 import org.zenith.tvos.ui.dock.AppItem
 
 /**
- * Storage abstraction for persisting app configurations (favorites, custom ordering, hidden apps)
+ * Storage abstraction for persisting app configurations (favorites, custom ordering, hidden apps, recent launches)
  * with zero Android Context dependency for deterministic JVM unit testability.
  */
 interface AppPreferencesStorage {
@@ -12,6 +12,8 @@ interface AppPreferencesStorage {
     fun loadFavorites(): List<String>?
     fun saveHidden(packageNames: Set<String>)
     fun loadHidden(): Set<String>?
+    fun saveRecentLaunches(packageNames: List<String>) {}
+    fun loadRecentLaunches(): List<String>? = null
 }
 
 /**
@@ -25,7 +27,7 @@ data class CategorySection(
 
 /**
  * Domain engine managing application categorization, user favorites dock,
- * remote-driven reordering, and air-gapped app hiding.
+ * MRU (Most Recently Used) launch history, remote-driven reordering, and air-gapped app hiding.
  */
 class AppLibraryManager(
     private val storage: AppPreferencesStorage? = null
@@ -33,10 +35,12 @@ class AppLibraryManager(
     private val allApps = mutableListOf<AppItem>()
     private val favoritePackageNames = mutableListOf<String>()
     private val hiddenPackageNames = mutableSetOf<String>()
+    private val recentPackageNames = mutableListOf<String>()
 
     init {
         storage?.loadFavorites()?.let { favoritePackageNames.addAll(it) }
         storage?.loadHidden()?.let { hiddenPackageNames.addAll(it) }
+        storage?.loadRecentLaunches()?.let { recentPackageNames.addAll(it) }
     }
 
     /**
@@ -51,6 +55,29 @@ class AppLibraryManager(
             favoritePackageNames.addAll(defaults)
             storage?.saveFavorites(favoritePackageNames)
         }
+    }
+
+    /**
+     * Records a successful application launch at the front of the MRU Recent Apps queue.
+     */
+    fun recordAppLaunch(packageName: String) {
+        if (packageName.isBlank()) return
+        recentPackageNames.remove(packageName)
+        recentPackageNames.add(0, packageName)
+        while (recentPackageNames.size > MAX_RECENT_COUNT) {
+            recentPackageNames.removeAt(recentPackageNames.lastIndex)
+        }
+        storage?.saveRecentLaunches(recentPackageNames)
+    }
+
+    /**
+     * Returns recently launched visible applications in MRU order (newest first).
+     */
+    fun getRecentApps(): List<AppItem> {
+        val appMap = allApps.associateBy { it.packageName }
+        return recentPackageNames
+            .filter { !hiddenPackageNames.contains(it) }
+            .mapNotNull { appMap[it] }
     }
 
     /**
@@ -204,5 +231,6 @@ class AppLibraryManager(
 
     companion object {
         const val DEFAULT_FAVORITES_COUNT = 6
+        const val MAX_RECENT_COUNT = 10
     }
 }

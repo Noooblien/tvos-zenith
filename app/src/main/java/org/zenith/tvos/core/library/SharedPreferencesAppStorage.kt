@@ -5,7 +5,7 @@ import android.content.SharedPreferences
 
 /**
  * Android SharedPreferences backed storage for lightweight persistence
- * of user launcher layout, favorites dock order, and hidden apps.
+ * of user launcher layout, favorites dock order, hidden apps, and MRU launch history.
  */
 class SharedPreferencesAppStorage(context: Context) : AppPreferencesStorage {
 
@@ -30,10 +30,22 @@ class SharedPreferencesAppStorage(context: Context) : AppPreferencesStorage {
         return prefs.getStringSet(KEY_HIDDEN, null)
     }
 
+    override fun saveRecentLaunches(packageNames: List<String>) {
+        val serialized = packageNames.joinToString(DELIMITER)
+        prefs.edit().putString(KEY_RECENTS, serialized).apply()
+    }
+
+    override fun loadRecentLaunches(): List<String>? {
+        val raw = prefs.getString(KEY_RECENTS, null) ?: return null
+        if (raw.isBlank()) return emptyList()
+        return raw.split(DELIMITER).filter { it.isNotBlank() }
+    }
+
     companion object {
         private const val PREFS_NAME = "tvos_zenith_library_prefs"
         private const val KEY_FAVORITES = "user_favorites_dock_order"
         private const val KEY_HIDDEN = "user_hidden_apps"
+        private const val KEY_RECENTS = "user_recent_app_launches"
         private const val DELIMITER = "|"
     }
 }

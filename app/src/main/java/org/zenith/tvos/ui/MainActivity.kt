@@ -49,6 +49,7 @@ import org.zenith.tvos.ui.dock.AppItem
 import org.zenith.tvos.ui.menu.AerialScreensaverDialog
 import org.zenith.tvos.ui.menu.AppContextMenuDialog
 import org.zenith.tvos.ui.menu.PhoneRemotePairingDialog
+import org.zenith.tvos.ui.menu.QuickAppSwitcherDialog
 import org.zenith.tvos.ui.menu.SpotlightSearchDialog
 import org.zenith.tvos.ui.menu.ZenithSettingsDialog
 import org.zenith.tvos.ui.topshelf.TopShelfHeroView
@@ -62,7 +63,7 @@ import org.zenith.tvos.ui.topshelf.TopShelfHeroView
  * - Zero-install local Wi-Fi Phone Remote Web Server & Companion App Support
  * - Procedural PCM 16-bit Tactile Audio Engine (zero asset bloat)
  * - Apple TV Aerial Ambient Screensaver with OLED pixel-shift protection
- * - Glassmorphic Zenith Settings, 60FPS Telemetry HUD & Smart RAM Boost
+ * - Glassmorphic Zenith Settings, 60FPS Telemetry HUD, Smart RAM Boost & Multitasking Switcher
  */
 class MainActivity : Activity() {
 
@@ -99,6 +100,7 @@ class MainActivity : Activity() {
     private val displayedApps = mutableListOf<AppItem>()
     private var currentCategoryFilter: AppCategory? = null
     private var isViewingFavorites: Boolean = true
+    private var isViewingRecent: Boolean = false
 
     // Currently focused app tracker for Top Shelf action dispatch
     private var currentFocusedApp: AppItem? = null
@@ -110,6 +112,7 @@ class MainActivity : Activity() {
 
     // Category Pill Buttons
     private lateinit var pillFavorites: Button
+    private lateinit var pillRecent: Button
     private lateinit var pillAll: Button
     private lateinit var pillStreaming: Button
     private lateinit var pillMusic: Button
@@ -248,6 +251,20 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun showQuickAppSwitcher() {
+        val recents = libraryManager.getRecentApps().ifEmpty { libraryManager.getFavorites() }
+        if (recents.isEmpty()) return
+        QuickAppSwitcherDialog(
+            context = this,
+            recentApps = recents,
+            focusEngine = focusEngine,
+            audioEngine = audioEngine,
+            onSelectApp = { app ->
+                launchAppSafely(app)
+            }
+        ).show()
+    }
+
     private fun showSettingsDialog() {
         ZenithSettingsDialog(
             context = this,
@@ -379,6 +396,7 @@ class MainActivity : Activity() {
 
     private fun initCategoryPills() {
         pillFavorites = findViewById(R.id.pillFavorites)
+        pillRecent = findViewById(R.id.pillRecent)
         pillAll = findViewById(R.id.pillAll)
         pillStreaming = findViewById(R.id.pillStreaming)
         pillMusic = findViewById(R.id.pillMusic)
@@ -388,6 +406,7 @@ class MainActivity : Activity() {
 
         val pills = listOf(
             pillFavorites to { filterFavorites() },
+            pillRecent to { filterRecent() },
             pillAll to { filterCategory(null) },
             pillStreaming to { filterCategory(AppCategory.STREAMING) },
             pillMusic to { filterCategory(AppCategory.MUSIC) },
@@ -417,6 +436,7 @@ class MainActivity : Activity() {
 
     private fun resetPillSelection() {
         pillFavorites.isSelected = false
+        pillRecent.isSelected = false
         pillAll.isSelected = false
         pillStreaming.isSelected = false
         pillMusic.isSelected = false
@@ -487,22 +507,33 @@ class MainActivity : Activity() {
     private fun filterFavorites() {
         if (isReordering) commitReorder()
         isViewingFavorites = true
+        isViewingRecent = false
         currentCategoryFilter = null
         updateDisplayedApps()
+    }
+
+    private fun filterRecent() {
+        if (isReordering) commitReorder()
+        isViewingFavorites = false
+        isViewingRecent = true
+        currentCategoryFilter = null
+        updateDisplayedApps()
+        showQuickAppSwitcher()
     }
 
     private fun filterCategory(category: AppCategory?) {
         if (isReordering) commitReorder()
         isViewingFavorites = false
+        isViewingRecent = false
         currentCategoryFilter = category
         updateDisplayedApps()
     }
 
     private fun updateDisplayedApps() {
-        val apps = if (isViewingFavorites) {
-            libraryManager.getFavorites()
-        } else {
-            libraryManager.getFilteredApps(currentCategoryFilter)
+        val apps = when {
+            isViewingFavorites -> libraryManager.getFavorites()
+            isViewingRecent -> libraryManager.getRecentApps().ifEmpty { libraryManager.getFavorites() }
+            else -> libraryManager.getFilteredApps(currentCategoryFilter)
         }
 
         displayedApps.clear()
@@ -675,6 +706,13 @@ class MainActivity : Activity() {
             }
         }
 
+        // Open Multitasking App Switcher on APP_SWITCH key
+        if (keyCode == KeyEvent.KEYCODE_APP_SWITCH) {
+            audioEngine.playSelectPop()
+            showQuickAppSwitcher()
+            return true
+        }
+
         // Open Zenith Spotlight Search on remote SEARCH key
         if (keyCode == KeyEvent.KEYCODE_SEARCH) {
             audioEngine.playSelectPop()
@@ -753,6 +791,8 @@ class MainActivity : Activity() {
     }
 
     private fun launchAppSafely(item: AppItem) {
+        libraryManager.recordAppLaunch(item.packageName)
+
         val safeIntent = IntentSanitizer.createSafeLaunchIntent(
             context = this,
             packageName = item.packageName,
