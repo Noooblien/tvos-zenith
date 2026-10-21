@@ -10,5 +10,6 @@ data class AppItem(
     val activityClassName: String,
     val label: String,
     val iconBitmap: Bitmap? = null,
-    val isSystemApp: Boolean = false
+    val isSystemApp: Boolean = false,
+    val category: AppCategory = AppCategory.OTHER
 )

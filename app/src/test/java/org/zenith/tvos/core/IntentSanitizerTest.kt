@@ -1,6 +1,9 @@
 package org.zenith.tvos.core
 
 import android.content.Intent
+import io.mockk.every
+import io.mockk.mockk
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -40,17 +43,31 @@ class IntentSanitizerTest {
 
     @Test
     fun testSanitizeFlagsStripsGrantUriPermissions() {
-        val intent = Intent().apply {
-            flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                    Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
-                    Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+        var currentFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
+                Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+
+        val intent = mockk<Intent>(relaxed = true)
+        every { intent.flags } answers { currentFlags }
+        every { intent.setFlags(any()) } answers {
+            currentFlags = firstArg()
+            intent
         }
 
         IntentSanitizer.sanitizeFlags(intent)
 
-        assertTrue((intent.flags and Intent.FLAG_ACTIVITY_NEW_TASK) != 0)
-        assertTrue((intent.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION) == 0)
-        assertTrue((intent.flags and Intent.FLAG_GRANT_WRITE_URI_PERMISSION) == 0)
-        assertTrue((intent.flags and Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION) == 0)
+        assertTrue((currentFlags and Intent.FLAG_ACTIVITY_NEW_TASK) != 0)
+        assertTrue((currentFlags and Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED) != 0)
+        assertTrue((currentFlags and Intent.FLAG_GRANT_READ_URI_PERMISSION) == 0)
+        assertTrue((currentFlags and Intent.FLAG_GRANT_WRITE_URI_PERMISSION) == 0)
+        assertTrue((currentFlags and Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION) == 0)
+
+        // Pure bitwise test
+        val bitwiseSanitized = IntentSanitizer.sanitizeFlags(
+            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+        )
+        assertTrue((bitwiseSanitized and Intent.FLAG_ACTIVITY_NEW_TASK) != 0)
+        assertTrue((bitwiseSanitized and Intent.FLAG_GRANT_READ_URI_PERMISSION) == 0)
+        assertTrue((bitwiseSanitized and Intent.FLAG_GRANT_WRITE_URI_PERMISSION) == 0)
     }
 }

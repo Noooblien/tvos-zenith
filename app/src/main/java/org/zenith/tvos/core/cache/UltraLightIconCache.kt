@@ -5,7 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
-import android.util.LruCache
+import androidx.collection.LruCache
 
 /**
  * Ultra-lightweight LRU Icon Cache specifically engineered for 5-10 year old Android TV boxes
@@ -19,8 +19,8 @@ class UltraLightIconCache(
 ) {
 
     private val cache: LruCache<String, Bitmap> = object : LruCache<String, Bitmap>(maxCacheBytes) {
-        override fun sizeOf(key: String, bitmap: Bitmap): Int {
-            return bitmap.byteCount
+        override fun sizeOf(key: String, value: Bitmap): Int {
+            return value.byteCount
         }
     }
 

@@ -33,21 +33,38 @@ class FramePacer(
         if (lastFrameTimeNanos != 0L) {
             val diffNanos = frameTimeNanos - lastFrameTimeNanos
             val frameTimeMs = diffNanos / 1_000_000L
-
-            // 60fps frame target is 16.6ms. A frame taking > 32ms has dropped at least 1 frame.
-            if (frameTimeMs > 32) {
-                val droppedFrames = (frameTimeMs / 16.6f).toInt()
-                Log.w(TAG, "Frame drop detected: $droppedFrames frames dropped ($frameTimeMs ms)")
-                onJankDetected?.invoke(droppedFrames, frameTimeMs)
-            }
+            evaluateFrame(frameTimeMs)
         }
 
         lastFrameTimeNanos = frameTimeNanos
         Choreographer.getInstance().postFrameCallback(this)
     }
 
+    /**
+     * Evaluates frame delta in milliseconds and triggers callback if jank occurs (>32ms).
+     * Returns the number of dropped frames detected.
+     */
+    fun evaluateFrame(frameTimeMs: Long): Int {
+        if (frameTimeMs > JANK_THRESHOLD_MS) {
+            val droppedFrames = computeDroppedFrames(frameTimeMs)
+            Log.w(TAG, "Frame drop detected: $droppedFrames frames dropped ($frameTimeMs ms)")
+            onJankDetected?.invoke(droppedFrames, frameTimeMs)
+            return droppedFrames
+        }
+        return 0
+    }
+
+    /**
+     * Calculates the number of dropped frames given a frame duration in milliseconds.
+     */
+    fun computeDroppedFrames(frameTimeMs: Long): Int {
+        if (frameTimeMs <= JANK_THRESHOLD_MS) return 0
+        return (frameTimeMs / TARGET_FRAME_DURATION_MS).toInt()
+    }
+
     companion object {
         private const val TAG = "FramePacer"
         const val TARGET_FRAME_DURATION_MS = 16.66f
+        const val JANK_THRESHOLD_MS = 32L
     }
 }

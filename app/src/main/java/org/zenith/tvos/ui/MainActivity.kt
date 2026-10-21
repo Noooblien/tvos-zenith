@@ -3,6 +3,7 @@ package org.zenith.tvos.ui
 import android.app.Activity
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
 import android.os.Bundle
@@ -22,6 +23,8 @@ import org.zenith.tvos.core.focus.SpatialFocusEngine
 import org.zenith.tvos.core.performance.FramePacer
 import org.zenith.tvos.core.security.IntentSanitizer
 import org.zenith.tvos.core.security.PackageChangeReceiver
+import org.zenith.tvos.ui.dock.AppCategory
+import org.zenith.tvos.ui.dock.AppCategoryClassifier
 import org.zenith.tvos.ui.dock.AppDockAdapter
 import org.zenith.tvos.ui.dock.AppItem
 import org.zenith.tvos.ui.topshelf.TopShelfHeroView
@@ -106,7 +109,7 @@ class MainActivity : Activity() {
                     topShelfHero.updateHero(
                         title = item.label,
                         subtitle = "Launch ${item.label} in ultra-high performance mode.",
-                        meta = "INSTALLED APP • READY"
+                        meta = "${item.category.displayName.uppercase()} • READY"
                     )
                 },
                 onAppClicked = { item ->
@@ -116,7 +119,13 @@ class MainActivity : Activity() {
             appRecyclerView.adapter = adapter
 
             if (appList.isNotEmpty()) {
-                focusedAppName.text = appList[0].label
+                val first = appList[0]
+                focusedAppName.text = first.label
+                topShelfHero.updateHero(
+                    title = first.label,
+                    subtitle = "Launch ${first.label} in ultra-high performance mode.",
+                    meta = "${first.category.displayName.uppercase()} • READY"
+                )
             }
         }
     }
@@ -150,12 +159,17 @@ class MainActivity : Activity() {
                 bmp
             }
 
+            val isSystem = (resolveInfo.activityInfo.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+            val category = AppCategoryClassifier.classify(pkg, label, isSystem)
+
             items.add(
                 AppItem(
                     packageName = pkg,
                     activityClassName = cls,
                     label = label,
-                    iconBitmap = cachedBitmap
+                    iconBitmap = cachedBitmap,
+                    isSystemApp = isSystem,
+                    category = category
                 )
             )
         }
@@ -201,12 +215,12 @@ class MainActivity : Activity() {
 
     private fun getShowcaseMockApps(): List<AppItem> {
         return listOf(
-            AppItem("com.netflix.ninja", "com.netflix.ninja.MainActivity", "Netflix"),
-            AppItem("com.google.android.youtube.tv", "com.google.android.youtube.tv.MainActivity", "YouTube"),
-            AppItem("com.plexapp.android", "com.plexapp.android.MainActivity", "Plex"),
-            AppItem("com.amazon.amazonvideo.livingroom", "com.amazon.amazonvideo.livingroom.MainActivity", "Prime Video"),
-            AppItem("com.android.tv.settings", "com.android.tv.settings.MainSettings", "Settings"),
-            AppItem("com.lonelycatgames.Xplore", "com.lonelycatgames.Xplore.MainActivity", "Files")
+            AppItem("com.netflix.ninja", "com.netflix.ninja.MainActivity", "Netflix", category = AppCategory.STREAMING),
+            AppItem("com.google.android.youtube.tv", "com.google.android.youtube.tv.MainActivity", "YouTube", category = AppCategory.STREAMING),
+            AppItem("com.plexapp.android", "com.plexapp.android.MainActivity", "Plex", category = AppCategory.STREAMING),
+            AppItem("com.amazon.amazonvideo.livingroom", "com.amazon.amazonvideo.livingroom.MainActivity", "Prime Video", category = AppCategory.STREAMING),
+            AppItem("com.android.tv.settings", "com.android.tv.settings.MainSettings", "Settings", isSystemApp = true, category = AppCategory.SYSTEM),
+            AppItem("com.lonelycatgames.Xplore", "com.lonelycatgames.Xplore.MainActivity", "Files", category = AppCategory.TOOLS)
         )
     }
 
