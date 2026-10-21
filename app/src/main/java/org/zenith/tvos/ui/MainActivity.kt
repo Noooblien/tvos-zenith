@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
 import android.os.Bundle
 import android.view.KeyEvent
+import android.view.View
 import android.widget.TextView
 import android.widget.Toast
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -24,6 +25,7 @@ import org.zenith.tvos.core.parallax.ParallaxBackdropEngine
 import org.zenith.tvos.core.performance.FramePacer
 import org.zenith.tvos.core.security.IntentSanitizer
 import org.zenith.tvos.core.security.PackageChangeReceiver
+import org.zenith.tvos.core.wallpaper.DynamicWallpaperEngine
 import org.zenith.tvos.ui.dock.AppCategory
 import org.zenith.tvos.ui.dock.AppCategoryClassifier
 import org.zenith.tvos.ui.dock.AppDockAdapter
@@ -37,7 +39,7 @@ import org.zenith.tvos.ui.topshelf.TopShelfHeroView
  * - < 120ms cold boot
  * - Zero background analytics or ad SDKs
  * - Strict 18MB PSS RAM ceiling
- * - Solid 60 FPS D-pad navigation with Spring Physics & Parallax
+ * - Solid 60 FPS D-pad navigation with Spring Physics, Parallax, and Procedural Wallpapers
  */
 class MainActivity : Activity() {
 
@@ -45,8 +47,10 @@ class MainActivity : Activity() {
     private val iconCache = UltraLightIconCache()
     private val focusEngine = SpatialFocusEngine(useSpringPhysics = true)
     private val parallaxEngine = ParallaxBackdropEngine()
+    private val wallpaperEngine = DynamicWallpaperEngine()
     private val framePacer = FramePacer()
 
+    private lateinit var rootContainer: View
     private lateinit var topShelfHero: TopShelfHeroView
     private lateinit var focusedAppName: TextView
     private lateinit var appRecyclerView: RecyclerView
@@ -58,9 +62,13 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        rootContainer = findViewById(R.id.rootContainer)
         topShelfHero = findViewById(R.id.topShelfHero)
         focusedAppName = findViewById(R.id.focusedAppName)
         appRecyclerView = findViewById(R.id.appRecyclerView)
+
+        // Apply default Midnight Obsidian backdrop
+        rootContainer.background = wallpaperEngine.createWallpaperDrawable(DynamicWallpaperEngine.Theme.MIDNIGHT_OBSIDIAN)
 
         setupRecyclerView()
         loadInstalledApps()
@@ -118,6 +126,10 @@ class MainActivity : Activity() {
                     val ratio = parallaxEngine.computeNormalizedRatio(position, appList.size)
                     val transX = parallaxEngine.computeBackdropTranslationX(ratio)
                     topShelfHero.applyParallax(transX)
+
+                    // Procedural Dynamic Wallpaper Shift per App Category
+                    val theme = wallpaperEngine.getThemeForCategory(item.category.name)
+                    rootContainer.background = wallpaperEngine.createWallpaperDrawable(theme)
                 },
                 onAppClicked = { item ->
                     launchAppSafely(item)
