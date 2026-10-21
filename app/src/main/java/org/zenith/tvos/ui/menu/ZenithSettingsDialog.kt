@@ -11,34 +11,37 @@ import android.widget.Toast
 import org.zenith.tvos.R
 import org.zenith.tvos.core.audio.TactileAudioEngine
 import org.zenith.tvos.core.library.AppLibraryManager
+import org.zenith.tvos.core.security.ParentalLockEngine
 import org.zenith.tvos.core.settings.ZenithSettingsManager
 
 /**
- * Glassmorphic Settings & Customization Modal for Zenith TV.
- * Allows D-pad cycling of Wallpaper themes, Tactile Sound feedback, 60FPS Telemetry HUD,
- * Smart RAM Boost, Ambient Screensaver timeouts, and restoring hidden applications.
+ * Glassmorphic Zenith TV Preferences Modal.
+ * Provides D-pad toggles for Wallpaper Theme, Tactile Audio, 60FPS Telemetry HUD,
+ * Smart RAM Boost, Parental PIN Management, Ambient Screensaver timeout, and Hidden App restoration.
  */
 class ZenithSettingsDialog(
     context: Context,
     private val settingsManager: ZenithSettingsManager,
     private val libraryManager: AppLibraryManager,
+    private val lockEngine: ParentalLockEngine,
     private val audioEngine: TactileAudioEngine,
     private val onSettingsChanged: () -> Unit,
     private val onSmartRamBoost: () -> Unit,
+    private val onChangeParentalPin: () -> Unit,
     private val onStartScreensaverNow: () -> Unit
 ) : Dialog(context) {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         requestWindowFeature(Window.FEATURE_NO_TITLE)
-        setContentView(R.layout.dialog_zenith_settings)
-
         window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+        setContentView(R.layout.dialog_zenith_settings)
 
         val btnWallpaper = findViewById<Button>(R.id.btnSettingWallpaper)
         val btnSound = findViewById<Button>(R.id.btnSettingSound)
         val btnHud = findViewById<Button>(R.id.btnSettingHud)
         val btnRamBoost = findViewById<Button>(R.id.btnSmartRamBoost)
+        val btnChangeParentalPin = findViewById<Button>(R.id.btnChangeParentalPin)
         val btnScreensaver = findViewById<Button>(R.id.btnSettingScreensaver)
         val btnPreviewScreensaver = findViewById<Button>(R.id.btnPreviewScreensaver)
         val btnUnhideAll = findViewById<Button>(R.id.btnUnhideAll)
@@ -48,6 +51,7 @@ class ZenithSettingsDialog(
             btnWallpaper.text = "🎨 Wallpaper: ${settingsManager.wallpaperMode.displayName}"
             btnSound.text = "🔊 Tactile Audio Clicks: ${if (settingsManager.isSoundEnabled) "ON" else "OFF"}"
             btnHud.text = "📊 60FPS & RAM Telemetry HUD: ${if (settingsManager.isHudOverlayEnabled) "ON" else "OFF"}"
+            btnChangeParentalPin.text = "🔐 Change Parental PIN (${lockEngine.getLockedCount()} Locked)"
             btnScreensaver.text = "🌙 Ambient Screensaver: ${settingsManager.formatScreensaverTimeout()}"
             btnUnhideAll.text = "👁️ Restore Hidden Apps (${libraryManager.getHiddenCount()})"
         }
@@ -59,6 +63,7 @@ class ZenithSettingsDialog(
             btnSound,
             btnHud,
             btnRamBoost,
+            btnChangeParentalPin,
             btnScreensaver,
             btnPreviewScreensaver,
             btnUnhideAll
@@ -100,6 +105,12 @@ class ZenithSettingsDialog(
         btnRamBoost.setOnClickListener {
             audioEngine.playSelectPop()
             onSmartRamBoost()
+        }
+
+        btnChangeParentalPin.setOnClickListener {
+            audioEngine.playSelectPop()
+            dismiss()
+            onChangeParentalPin()
         }
 
         btnScreensaver.setOnClickListener {

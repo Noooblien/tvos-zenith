@@ -11,11 +11,13 @@ import org.zenith.tvos.core.focus.SpatialFocusEngine
 
 /**
  * High-performance horizontal dock and grid adapter with zero-allocation onBind,
- * directional 3D specular card tilt, tvOS long-press contextual menus, and interactive remote reordering.
+ * directional 3D specular card tilt, Parental PIN lock badge, tvOS long-press contextual menus,
+ * and interactive remote reordering.
  */
 class AppDockAdapter(
     private val apps: MutableList<AppItem>,
     private val focusEngine: SpatialFocusEngine,
+    private val isPackageLockedProvider: (String) -> Boolean = { false },
     private val onAppFocused: (AppItem, Int) -> Unit,
     private val onAppClicked: (AppItem) -> Unit,
     private val onAppLongClicked: ((AppItem, Int) -> Unit)? = null
@@ -68,10 +70,12 @@ class AppDockAdapter(
     override fun onBindViewHolder(holder: AppViewHolder, position: Int) {
         val item = apps[position]
         val isItemReordering = isReorderMode && position == reorderPosition
+        val isLocked = isPackageLockedProvider(item.packageName)
         holder.bind(
             item = item,
             position = position,
             isReordering = isItemReordering,
+            isLocked = isLocked,
             tiltProvider = {
                 focusEngine.computeDirectionalTiltY(lastFocusedPosition, position)
             },
@@ -92,18 +96,21 @@ class AppDockAdapter(
     ) : RecyclerView.ViewHolder(itemView) {
         private val cardContainer: View = itemView.findViewById(R.id.cardContainer)
         private val appIcon: ImageView = itemView.findViewById(R.id.appIcon)
+        private val lockBadge: TextView = itemView.findViewById(R.id.lockBadge)
         private val appTitle: TextView = itemView.findViewById(R.id.appTitle)
 
         fun bind(
             item: AppItem,
             position: Int,
             isReordering: Boolean,
+            isLocked: Boolean,
             tiltProvider: () -> Float,
             onFocused: (AppItem, Int) -> Unit,
             onClicked: (AppItem) -> Unit,
             onLongClicked: ((AppItem, Int) -> Unit)?
         ) {
             appTitle.text = item.label
+            lockBadge.visibility = if (isLocked) View.VISIBLE else View.GONE
 
             if (item.iconBitmap != null) {
                 appIcon.setImageBitmap(item.iconBitmap)

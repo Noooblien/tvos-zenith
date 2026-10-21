@@ -38,6 +38,8 @@ import org.zenith.tvos.core.screensaver.IdleScreensaverEngine
 import org.zenith.tvos.core.search.FuzzyAppSearchEngine
 import org.zenith.tvos.core.security.IntentSanitizer
 import org.zenith.tvos.core.security.PackageChangeReceiver
+import org.zenith.tvos.core.security.ParentalLockEngine
+import org.zenith.tvos.core.security.SharedPreferencesParentalLockStorage
 import org.zenith.tvos.core.settings.SharedPreferencesSettingsStorage
 import org.zenith.tvos.core.settings.WallpaperMode
 import org.zenith.tvos.core.settings.ZenithSettingsManager
@@ -48,6 +50,7 @@ import org.zenith.tvos.ui.dock.AppDockAdapter
 import org.zenith.tvos.ui.dock.AppItem
 import org.zenith.tvos.ui.menu.AerialScreensaverDialog
 import org.zenith.tvos.ui.menu.AppContextMenuDialog
+import org.zenith.tvos.ui.menu.ParentalPinDialog
 import org.zenith.tvos.ui.menu.PhoneRemotePairingDialog
 import org.zenith.tvos.ui.menu.QuickAppSwitcherDialog
 import org.zenith.tvos.ui.menu.SpotlightSearchDialog
@@ -59,10 +62,11 @@ import org.zenith.tvos.ui.topshelf.TopShelfHeroView
  *
  * Core Architecture & Features:
  * - Pixel-perfect width alignment between TopShelf Hero and Frosted Dock
- * - Authentic Apple TV pill action buttons with fluid focus scaling
+ * - Authentic Apple TV pill action buttons with fluid focus scaling & 3D specular card tilt
  * - Zero-install local Wi-Fi Phone Remote Web Server & Companion App Support
  * - Procedural PCM 16-bit Tactile Audio Engine (zero asset bloat)
  * - Apple TV Aerial Ambient Screensaver with OLED pixel-shift protection
+ * - Zero-Trust Parental App Lock & Salted SHA-256 PIN Guard
  * - Glassmorphic Zenith Settings, 60FPS Telemetry HUD, Smart RAM Boost & Multitasking Switcher
  */
 class MainActivity : Activity() {
@@ -85,6 +89,7 @@ class MainActivity : Activity() {
 
     private lateinit var libraryManager: AppLibraryManager
     private lateinit var settingsManager: ZenithSettingsManager
+    private lateinit var parentalLockEngine: ParentalLockEngine
     private lateinit var rootContainer: View
     private lateinit var topShelfHero: TopShelfHeroView
     private lateinit var tvTelemetryHud: TextView
@@ -145,6 +150,7 @@ class MainActivity : Activity() {
 
         libraryManager = AppLibraryManager(SharedPreferencesAppStorage(this))
         settingsManager = ZenithSettingsManager(SharedPreferencesSettingsStorage(this))
+        parentalLockEngine = ParentalLockEngine(SharedPreferencesParentalLockStorage(this))
 
         rootContainer = findViewById(R.id.rootContainer)
         topShelfHero = findViewById(R.id.topShelfHero)
@@ -270,6 +276,7 @@ class MainActivity : Activity() {
             context = this,
             settingsManager = settingsManager,
             libraryManager = libraryManager,
+            lockEngine = parentalLockEngine,
             audioEngine = audioEngine,
             onSettingsChanged = {
                 syncSettingsState()
@@ -280,6 +287,19 @@ class MainActivity : Activity() {
                 val reclaimedKb = (reclaimedBytes / 1024L).coerceAtLeast(128L)
                 syncSettingsState()
                 Toast.makeText(this, "⚡ Smart RAM Boost complete (~${reclaimedKb} KB freed)", Toast.LENGTH_SHORT).show()
+            },
+            onChangeParentalPin = {
+                ParentalPinDialog(
+                    context = this,
+                    title = "🔐 Change Parental PIN",
+                    subtitle = "Enter your current 4-digit PIN first",
+                    lockEngine = parentalLockEngine,
+                    audioEngine = audioEngine,
+                    mode = ParentalPinDialog.Mode.CHANGE_PIN,
+                    onVerified = {
+                        Toast.makeText(this, "✓ Parental PIN updated", Toast.LENGTH_SHORT).show()
+                    }
+                ).show()
             },
             onStartScreensaverNow = {
                 screensaverEngine.activateNow()
@@ -529,6 +549,14 @@ class MainActivity : Activity() {
         updateDisplayedApps()
     }
 
+    private fun formatFocusedAppTitle(item: AppItem): String {
+        return if (parentalLockEngine.isPackageLocked(item.packageName)) {
+            "🔒 ${item.label}"
+        } else {
+            item.label
+        }
+    }
+
     private fun updateDisplayedApps() {
         val apps = when {
             isViewingFavorites -> libraryManager.getFavorites()
@@ -542,12 +570,13 @@ class MainActivity : Activity() {
         val adapter = AppDockAdapter(
             apps = displayedApps,
             focusEngine = focusEngine,
+            isPackageLockedProvider = { pkg -> parentalLockEngine.isPackageLocked(pkg) },
             onAppFocused = { item, position ->
                 audioEngine.playFocusTick()
                 if (!isReordering) {
                     currentFocusedApp = item
                     currentFocusedPos = position
-                    focusedAppName.text = item.label
+                    focusedAppName.text = formatFocusedAppTitle(item)
 
                     // Offline contextual Top Shelf content resolution
                     val heroContent = topShelfEngine.resolveContent(item)
@@ -583,7 +612,7 @@ class MainActivity : Activity() {
             val first = displayedApps[0]
             currentFocusedApp = first
             currentFocusedPos = 0
-            focusedAppName.text = first.label
+            focusedAppName.text = formatFocusedAppTitle(first)
             val heroContent = topShelfEngine.resolveContent(first)
             topShelfHero.updateHero(heroContent)
             applyCurrentWallpaper(first.category)
@@ -595,10 +624,12 @@ class MainActivity : Activity() {
 
     private fun showContextMenu(item: AppItem, position: Int) {
         val isPinned = libraryManager.isFavorite(item.packageName)
+        val isLocked = parentalLockEngine.isPackageLocked(item.packageName)
         val dialog = AppContextMenuDialog(
             context = this,
             appItem = item,
             isPinned = isPinned,
+            isLocked = isLocked,
             focusEngine = focusEngine,
             onTogglePin = { app ->
                 audioEngine.playSelectPop()
@@ -614,6 +645,27 @@ class MainActivity : Activity() {
             onReorder = { _ ->
                 audioEngine.playSelectPop()
                 startReorder(position)
+            },
+            onToggleLock = { app ->
+                audioEngine.playSelectPop()
+                if (isLocked) {
+                    ParentalPinDialog(
+                        context = this,
+                        title = "🔓 Unlock ${app.label}",
+                        subtitle = "Enter your 4-digit Parental PIN to remove lock",
+                        lockEngine = parentalLockEngine,
+                        audioEngine = audioEngine,
+                        onVerified = {
+                            parentalLockEngine.unlockPackage(app.packageName)
+                            Toast.makeText(this, "🔓 Unlocked ${app.label}", Toast.LENGTH_SHORT).show()
+                            updateDisplayedApps()
+                        }
+                    ).show()
+                } else {
+                    parentalLockEngine.lockPackage(app.packageName)
+                    Toast.makeText(this, "🔒 Locked ${app.label} with Parental PIN", Toast.LENGTH_SHORT).show()
+                    updateDisplayedApps()
+                }
             },
             onAppInfo = { app ->
                 audioEngine.playSelectPop()
@@ -661,7 +713,7 @@ class MainActivity : Activity() {
         val adapter = appRecyclerView.adapter as? AppDockAdapter
         adapter?.setReorderMode(false)
         if (reorderCurrentPos in displayedApps.indices) {
-            focusedAppName.text = displayedApps[reorderCurrentPos].label
+            focusedAppName.text = formatFocusedAppTitle(displayedApps[reorderCurrentPos])
         }
         reorderCurrentPos = -1
         Toast.makeText(this, "Layout arrangement saved", Toast.LENGTH_SHORT).show()
@@ -791,6 +843,23 @@ class MainActivity : Activity() {
     }
 
     private fun launchAppSafely(item: AppItem) {
+        if (parentalLockEngine.isPackageLocked(item.packageName)) {
+            ParentalPinDialog(
+                context = this,
+                title = "🔒 ${item.label} Locked",
+                subtitle = "Enter your 4-digit Parental PIN to launch",
+                lockEngine = parentalLockEngine,
+                audioEngine = audioEngine,
+                onVerified = {
+                    executeVerifiedLaunch(item)
+                }
+            ).show()
+            return
+        }
+        executeVerifiedLaunch(item)
+    }
+
+    private fun executeVerifiedLaunch(item: AppItem) {
         libraryManager.recordAppLaunch(item.packageName)
 
         val safeIntent = IntentSanitizer.createSafeLaunchIntent(

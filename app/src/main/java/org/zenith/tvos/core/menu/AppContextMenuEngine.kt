@@ -12,6 +12,7 @@ import org.zenith.tvos.ui.dock.AppItem
 enum class ContextActionId {
     TOGGLE_PIN,
     REORDER,
+    TOGGLE_LOCK,
     APP_INFO,
     HIDE_APP,
     UNINSTALL
@@ -33,9 +34,13 @@ data class ContextMenuItem(
 class AppContextMenuEngine {
 
     /**
-     * Resolves the list of available actions for a specific app given the library state.
+     * Resolves the list of available actions for a specific app given the library and lock state.
      */
-    fun resolveMenuItems(item: AppItem, isPinned: Boolean): List<ContextMenuItem> {
+    fun resolveMenuItems(
+        item: AppItem,
+        isPinned: Boolean,
+        isLocked: Boolean = false
+    ): List<ContextMenuItem> {
         val items = mutableListOf<ContextMenuItem>()
 
         // 1. Pin / Unpin
@@ -46,13 +51,18 @@ class AppContextMenuEngine {
         // 2. Reorder / Move
         items.add(ContextMenuItem(ContextActionId.REORDER, "Move App", "⇄"))
 
-        // 3. App Details
+        // 3. Parental PIN Lock / Unlock
+        val lockTitle = if (isLocked) "Unlock App (Remove PIN)" else "Lock App with PIN"
+        val lockIcon = if (isLocked) "🔓" else "🔒"
+        items.add(ContextMenuItem(ContextActionId.TOGGLE_LOCK, lockTitle, lockIcon))
+
+        // 4. App Details
         items.add(ContextMenuItem(ContextActionId.APP_INFO, "App Info", "ℹ️"))
 
-        // 4. Hide App
+        // 5. Hide App
         items.add(ContextMenuItem(ContextActionId.HIDE_APP, "Hide App", "👁️‍🗨️"))
 
-        // 5. Uninstall (strictly blocked for system apps)
+        // 6. Uninstall (strictly blocked for system apps)
         if (!item.isSystemApp) {
             items.add(ContextMenuItem(ContextActionId.UNINSTALL, "Uninstall", "🗑️", isDestructive = true))
         }

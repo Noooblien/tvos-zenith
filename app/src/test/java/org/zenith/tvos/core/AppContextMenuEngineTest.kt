@@ -24,23 +24,26 @@ class AppContextMenuEngineTest {
             category = AppCategory.STREAMING
         )
 
-        val items = engine.resolveMenuItems(app, isPinned = true)
+        val items = engine.resolveMenuItems(app, isPinned = true, isLocked = false)
         val actionIds = items.map { it.id }
 
-        // Must contain all 5 actions including UNINSTALL
+        // Must contain all 6 actions including TOGGLE_LOCK and UNINSTALL
         assertTrue(actionIds.contains(ContextActionId.TOGGLE_PIN))
         assertTrue(actionIds.contains(ContextActionId.REORDER))
+        assertTrue(actionIds.contains(ContextActionId.TOGGLE_LOCK))
         assertTrue(actionIds.contains(ContextActionId.APP_INFO))
         assertTrue(actionIds.contains(ContextActionId.HIDE_APP))
         assertTrue(actionIds.contains(ContextActionId.UNINSTALL))
 
-        // Since isPinned is true, label must say "Remove from Favorites"
         val pinAction = items.first { it.id == ContextActionId.TOGGLE_PIN }
         assertEquals("Remove from Favorites", pinAction.title)
+
+        val lockAction = items.first { it.id == ContextActionId.TOGGLE_LOCK }
+        assertEquals("Lock App with PIN", lockAction.title)
     }
 
     @Test
-    fun testResolveMenuItemsForSystemAppExcludesUninstall() {
+    fun testResolveMenuItemsForLockedSystemApp() {
         val systemApp = AppItem(
             packageName = "com.android.tv.settings",
             activityClassName = "com.android.tv.settings.MainSettings",
@@ -49,15 +52,17 @@ class AppContextMenuEngineTest {
             category = AppCategory.SYSTEM
         )
 
-        val items = engine.resolveMenuItems(systemApp, isPinned = false)
+        val items = engine.resolveMenuItems(systemApp, isPinned = false, isLocked = true)
         val actionIds = items.map { it.id }
 
         // Must NOT contain UNINSTALL
         assertFalse(actionIds.contains(ContextActionId.UNINSTALL))
 
-        // Since isPinned is false, label must say "Pin to Favorites"
         val pinAction = items.first { it.id == ContextActionId.TOGGLE_PIN }
         assertEquals("Pin to Favorites", pinAction.title)
+
+        val lockAction = items.first { it.id == ContextActionId.TOGGLE_LOCK }
+        assertEquals("Unlock App (Remove PIN)", lockAction.title)
     }
 
     @Test

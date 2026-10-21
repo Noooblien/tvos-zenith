@@ -60,7 +60,7 @@
     <Button
         android:id="@+id/btnTogglePin"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
+        android:layout_height="46dp"
         android:layout_marginBottom="8dp"
         android:background="@drawable/bg_menu_item"
         android:focusable="true"
@@ -69,12 +69,12 @@
         android:text="📌 Pin to Favorites"
         android:textAllCaps="false"
         android:textColor="@color/tvos_text_primary"
-        android:textSize="15sp" />
+        android:textSize="14.5sp" />
 
     <Button
         android:id="@+id/btnReorder"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
+        android:layout_height="46dp"
         android:layout_marginBottom="8dp"
         android:background="@drawable/bg_menu_item"
         android:focusable="true"
@@ -83,12 +83,26 @@
         android:text="⇄ Move App"
         android:textAllCaps="false"
         android:textColor="@color/tvos_text_primary"
-        android:textSize="15sp" />
+        android:textSize="14.5sp" />
+
+    <Button
+        android:id="@+id/btnToggleLock"
+        android:layout_width="match_parent"
+        android:layout_height="46dp"
+        android:layout_marginBottom="8dp"
+        android:background="@drawable/bg_menu_item"
+        android:focusable="true"
+        android:gravity="start|center_vertical"
+        android:paddingHorizontal="16dp"
+        android:text="🔒 Lock App with PIN"
+        android:textAllCaps="false"
+        android:textColor="@color/tvos_text_primary"
+        android:textSize="14.5sp" />
 
     <Button
         android:id="@+id/btnAppInfo"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
+        android:layout_height="46dp"
         android:layout_marginBottom="8dp"
         android:background="@drawable/bg_menu_item"
         android:focusable="true"
@@ -97,12 +111,12 @@
         android:text="ℹ️ App Info"
         android:textAllCaps="false"
         android:textColor="@color/tvos_text_primary"
-        android:textSize="15sp" />
+        android:textSize="14.5sp" />
 
     <Button
         android:id="@+id/btnHideApp"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
+        android:layout_height="46dp"
         android:layout_marginBottom="8dp"
         android:background="@drawable/bg_menu_item"
         android:focusable="true"
@@ -111,12 +125,12 @@
         android:text="👁️ Hide App"
         android:textAllCaps="false"
         android:textColor="@color/tvos_text_primary"
-        android:textSize="15sp" />
+        android:textSize="14.5sp" />
 
     <Button
         android:id="@+id/btnUninstall"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
+        android:layout_height="46dp"
         android:layout_marginBottom="8dp"
         android:background="@drawable/bg_menu_item"
         android:focusable="true"
@@ -125,6 +139,6 @@
         android:text="🗑️ Uninstall"
         android:textAllCaps="false"
         android:textColor="#FF453A"
-        android:textSize="15sp" />
+        android:textSize="14.5sp" />
 
 </LinearLayout>

@@ -12,26 +12,26 @@ import android.widget.ImageView
 import android.widget.TextView
 import org.zenith.tvos.R
 import org.zenith.tvos.core.focus.SpatialFocusEngine
-import org.zenith.tvos.core.menu.AppContextMenuEngine
 import org.zenith.tvos.ui.dock.AppItem
 
 /**
- * Apple TV style frosted glass modal context menu.
- * Triggered on D-pad Center long-press to manage pinning, reordering, info, hiding, and removal.
+ * Apple TV style Frosted Glass Long-Press Context Menu Dialog.
+ * Supports D-pad navigation, Favorite Pin/Unpin, Interactive Reorder,
+ * Parental PIN Lock/Unlock, App Info, Hide App, and Uninstall.
  */
 class AppContextMenuDialog(
     context: Context,
     private val appItem: AppItem,
     private val isPinned: Boolean,
+    private val isLocked: Boolean,
     private val focusEngine: SpatialFocusEngine,
     private val onTogglePin: (AppItem) -> Unit,
     private val onReorder: (AppItem) -> Unit,
+    private val onToggleLock: (AppItem) -> Unit,
     private val onAppInfo: (AppItem) -> Unit,
     private val onHideApp: (AppItem) -> Unit,
     private val onUninstall: (AppItem) -> Unit
 ) : Dialog(context) {
-
-    private val menuEngine = AppContextMenuEngine()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -45,12 +45,13 @@ class AppContextMenuDialog(
 
         val btnTogglePin = findViewById<Button>(R.id.btnTogglePin)
         val btnReorder = findViewById<Button>(R.id.btnReorder)
+        val btnToggleLock = findViewById<Button>(R.id.btnToggleLock)
         val btnAppInfo = findViewById<Button>(R.id.btnAppInfo)
         val btnHideApp = findViewById<Button>(R.id.btnHideApp)
         val btnUninstall = findViewById<Button>(R.id.btnUninstall)
 
         // Populate header
-        appTitle.text = appItem.label
+        appTitle.text = if (isLocked) "🔒 ${appItem.label}" else appItem.label
         appMeta.text = "${appItem.category.displayName.uppercase()} • ${if (appItem.isSystemApp) "SYSTEM" else "USER APP"}"
         if (appItem.iconBitmap != null) {
             appIcon.setImageBitmap(appItem.iconBitmap)
@@ -58,8 +59,9 @@ class AppContextMenuDialog(
             appIcon.setImageResource(R.drawable.ic_tvos_logo)
         }
 
-        // Configure Pin button
+        // Configure Pin & Lock buttons
         btnTogglePin.text = if (isPinned) "⭐ Remove from Favorites" else "📌 Pin to Favorites"
+        btnToggleLock.text = if (isLocked) "🔓 Unlock App (Remove PIN)" else "🔒 Lock App with PIN"
 
         // Configure Uninstall button
         if (appItem.isSystemApp) {
@@ -68,8 +70,8 @@ class AppContextMenuDialog(
             btnUninstall.visibility = View.VISIBLE
         }
 
-        // Attach focus engine for tvOS tactile feedback
-        val buttons = listOf(btnTogglePin, btnReorder, btnAppInfo, btnHideApp, btnUninstall)
+        // Attach focus feedback for tvOS tactile highlight
+        val buttons = listOf(btnTogglePin, btnReorder, btnToggleLock, btnAppInfo, btnHideApp, btnUninstall)
         for (btn in buttons) {
             btn.setOnFocusChangeListener { view, hasFocus ->
                 val b = view as Button
@@ -90,6 +92,11 @@ class AppContextMenuDialog(
         btnReorder.setOnClickListener {
             dismiss()
             onReorder(appItem)
+        }
+
+        btnToggleLock.setOnClickListener {
+            dismiss()
+            onToggleLock(appItem)
         }
 
         btnAppInfo.setOnClickListener {
