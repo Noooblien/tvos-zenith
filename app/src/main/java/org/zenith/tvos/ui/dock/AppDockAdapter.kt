@@ -15,7 +15,7 @@ import org.zenith.tvos.core.focus.SpatialFocusEngine
 class AppDockAdapter(
     private val apps: List<AppItem>,
     private val focusEngine: SpatialFocusEngine,
-    private val onAppFocused: (AppItem) -> Unit,
+    private val onAppFocused: (AppItem, Int) -> Unit,
     private val onAppClicked: (AppItem) -> Unit
 ) : RecyclerView.Adapter<AppDockAdapter.AppViewHolder>() {
 
@@ -26,7 +26,7 @@ class AppDockAdapter(
 
     override fun onBindViewHolder(holder: AppViewHolder, position: Int) {
         val item = apps[position]
-        holder.bind(item, onAppFocused, onAppClicked)
+        holder.bind(item, position, onAppFocused, onAppClicked)
     }
 
     override fun getItemCount(): Int = apps.size
@@ -41,7 +41,8 @@ class AppDockAdapter(
 
         fun bind(
             item: AppItem,
-            onFocused: (AppItem) -> Unit,
+            position: Int,
+            onFocused: (AppItem, Int) -> Unit,
             onClicked: (AppItem) -> Unit
         ) {
             appTitle.text = item.label
@@ -54,7 +55,7 @@ class AppDockAdapter(
 
             focusEngine.attach(cardContainer) { hasFocus ->
                 if (hasFocus) {
-                    onFocused(item)
+                    onFocused(item, position)
                     appTitle.visibility = View.VISIBLE
                 } else {
                     appTitle.visibility = View.GONE

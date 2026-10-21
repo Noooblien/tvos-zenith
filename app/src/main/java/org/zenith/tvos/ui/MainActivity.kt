@@ -20,6 +20,7 @@ import kotlinx.coroutines.withContext
 import org.zenith.tvos.R
 import org.zenith.tvos.core.cache.UltraLightIconCache
 import org.zenith.tvos.core.focus.SpatialFocusEngine
+import org.zenith.tvos.core.parallax.ParallaxBackdropEngine
 import org.zenith.tvos.core.performance.FramePacer
 import org.zenith.tvos.core.security.IntentSanitizer
 import org.zenith.tvos.core.security.PackageChangeReceiver
@@ -36,13 +37,14 @@ import org.zenith.tvos.ui.topshelf.TopShelfHeroView
  * - < 120ms cold boot
  * - Zero background analytics or ad SDKs
  * - Strict 18MB PSS RAM ceiling
- * - Solid 60 FPS D-pad navigation
+ * - Solid 60 FPS D-pad navigation with Spring Physics & Parallax
  */
 class MainActivity : Activity() {
 
     private val scope = CoroutineScope(Dispatchers.Main + Job())
     private val iconCache = UltraLightIconCache()
-    private val focusEngine = SpatialFocusEngine()
+    private val focusEngine = SpatialFocusEngine(useSpringPhysics = true)
+    private val parallaxEngine = ParallaxBackdropEngine()
     private val framePacer = FramePacer()
 
     private lateinit var topShelfHero: TopShelfHeroView
@@ -104,13 +106,18 @@ class MainActivity : Activity() {
             val adapter = AppDockAdapter(
                 apps = appList,
                 focusEngine = focusEngine,
-                onAppFocused = { item ->
+                onAppFocused = { item, position ->
                     focusedAppName.text = item.label
                     topShelfHero.updateHero(
                         title = item.label,
                         subtitle = "Launch ${item.label} in ultra-high performance mode.",
                         meta = "${item.category.displayName.uppercase()} • READY"
                     )
+
+                    // Apple TV Dynamic 2.5D Parallax Shift
+                    val ratio = parallaxEngine.computeNormalizedRatio(position, appList.size)
+                    val transX = parallaxEngine.computeBackdropTranslationX(ratio)
+                    topShelfHero.applyParallax(transX)
                 },
                 onAppClicked = { item ->
                     launchAppSafely(item)

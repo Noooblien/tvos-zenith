@@ -12,7 +12,8 @@ import android.widget.TextView
 
 /**
  * Apple TV Top Shelf dynamic hero container.
- * Displays high-impact cinematic backdrop, metadata badges, and quick-action buttons.
+ * Displays high-impact cinematic backdrop, metadata badges, quick-action buttons,
+ * and responds to horizontal D-pad parallax motion.
  */
 class TopShelfHeroView @JvmOverloads constructor(
     context: Context,
@@ -108,5 +109,15 @@ class TopShelfHeroView @JvmOverloads constructor(
             metaBadgeView.text = meta
             animate().alpha(1.0f).setDuration(120L).start()
         }.start()
+    }
+
+    /**
+     * Applies subtle parallax translation to hero container during D-pad carousel navigation.
+     */
+    fun applyParallax(translationX: Float) {
+        animate()
+            .translationX(translationX)
+            .setDuration(150L)
+            .start()
     }
 }
