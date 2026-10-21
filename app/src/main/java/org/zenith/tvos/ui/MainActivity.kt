@@ -34,6 +34,7 @@ import org.zenith.tvos.core.performance.FramePacer
 import org.zenith.tvos.core.recommendation.OfflineTopShelfContentEngine
 import org.zenith.tvos.core.remote.ZenithRemoteServer
 import org.zenith.tvos.core.screensaver.IdleScreensaverEngine
+import org.zenith.tvos.core.search.FuzzyAppSearchEngine
 import org.zenith.tvos.core.security.IntentSanitizer
 import org.zenith.tvos.core.security.PackageChangeReceiver
 import org.zenith.tvos.core.settings.SharedPreferencesSettingsStorage
@@ -47,6 +48,7 @@ import org.zenith.tvos.ui.dock.AppItem
 import org.zenith.tvos.ui.menu.AerialScreensaverDialog
 import org.zenith.tvos.ui.menu.AppContextMenuDialog
 import org.zenith.tvos.ui.menu.PhoneRemotePairingDialog
+import org.zenith.tvos.ui.menu.SpotlightSearchDialog
 import org.zenith.tvos.ui.menu.ZenithSettingsDialog
 import org.zenith.tvos.ui.topshelf.TopShelfHeroView
 
@@ -59,7 +61,7 @@ import org.zenith.tvos.ui.topshelf.TopShelfHeroView
  * - Zero-install local Wi-Fi Phone Remote Web Server & Companion App Support
  * - Procedural PCM 16-bit Tactile Audio Engine (zero asset bloat)
  * - Apple TV Aerial Ambient Screensaver with OLED pixel-shift protection
- * - Glassmorphic Zenith Settings & Customization modal
+ * - Glassmorphic Zenith Settings & Spotlight Fuzzy Quick-Search Modal
  */
 class MainActivity : Activity() {
 
@@ -75,18 +77,21 @@ class MainActivity : Activity() {
     private val remoteServer = ZenithRemoteServer(port = 8080)
     private val audioEngine = TactileAudioEngine()
     private val screensaverEngine = IdleScreensaverEngine()
+    private val searchEngine = FuzzyAppSearchEngine()
     private val mainHandler = Handler(Looper.getMainLooper())
 
     private lateinit var libraryManager: AppLibraryManager
     private lateinit var settingsManager: ZenithSettingsManager
     private lateinit var rootContainer: View
     private lateinit var topShelfHero: TopShelfHeroView
+    private lateinit var btnSpotlightSearch: Button
     private lateinit var btnPhoneRemote: Button
     private lateinit var btnZenithSettings: Button
     private lateinit var focusedAppName: TextView
     private lateinit var appRecyclerView: RecyclerView
     private var packageReceiver: PackageChangeReceiver? = null
     private var activeScreensaverDialog: AerialScreensaverDialog? = null
+    private var activeSpotlightDialog: SpotlightSearchDialog? = null
 
     private val displayedApps = mutableListOf<AppItem>()
     private var currentCategoryFilter: AppCategory? = null
@@ -127,6 +132,7 @@ class MainActivity : Activity() {
 
         rootContainer = findViewById(R.id.rootContainer)
         topShelfHero = findViewById(R.id.topShelfHero)
+        btnSpotlightSearch = findViewById(R.id.btnSpotlightSearch)
         btnPhoneRemote = findViewById(R.id.btnPhoneRemote)
         btnZenithSettings = findViewById(R.id.btnZenithSettings)
         focusedAppName = findViewById(R.id.focusedAppName)
@@ -136,7 +142,7 @@ class MainActivity : Activity() {
         initCategoryPills()
         setupTopShelfActions()
         initPhoneRemoteServer()
-        initSettingsButton()
+        initUtilityButtons()
 
         setupRecyclerView()
         loadInstalledApps()
@@ -166,7 +172,21 @@ class MainActivity : Activity() {
         rootContainer.background = wallpaperEngine.createWallpaperDrawable(theme)
     }
 
-    private fun initSettingsButton() {
+    private fun initUtilityButtons() {
+        btnSpotlightSearch.setOnClickListener {
+            audioEngine.playSelectPop()
+            showSpotlightSearch("")
+        }
+
+        btnSpotlightSearch.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                audioEngine.playFocusTick()
+                btnSpotlightSearch.setTextColor(Color.BLACK)
+            } else {
+                btnSpotlightSearch.setTextColor(Color.parseColor("#F5F5F7"))
+            }
+        }
+
         btnZenithSettings.setOnClickListener {
             audioEngine.playSelectPop()
             showSettingsDialog()
@@ -179,6 +199,28 @@ class MainActivity : Activity() {
             } else {
                 btnZenithSettings.setTextColor(Color.parseColor("#F5F5F7"))
             }
+        }
+    }
+
+    private fun showSpotlightSearch(initialQuery: String = "") {
+        val existing = activeSpotlightDialog
+        if (existing != null && existing.isShowing) {
+            existing.updateExternalQuery(initialQuery)
+            return
+        }
+        val dialog = SpotlightSearchDialog(
+            context = this,
+            allVisibleApps = libraryManager.getVisibleApps(),
+            searchEngine = searchEngine,
+            audioEngine = audioEngine,
+            onLaunchApp = { app ->
+                launchAppSafely(app)
+            }
+        )
+        activeSpotlightDialog = dialog
+        dialog.show()
+        if (initialQuery.isNotEmpty()) {
+            dialog.updateExternalQuery(initialQuery)
         }
     }
 
@@ -232,6 +274,30 @@ class MainActivity : Activity() {
             }
         }
 
+        remoteServer.appListProvider = {
+            libraryManager.getVisibleApps().map { app ->
+                ZenithRemoteServer.RemoteAppEntry(
+                    packageName = app.packageName,
+                    label = app.label,
+                    category = app.category.displayName
+                )
+            }
+        }
+
+        remoteServer.onLaunchPackageRequested = { pkg ->
+            val targetApp = libraryManager.getVisibleApps().find { it.packageName == pkg }
+            if (targetApp != null) {
+                runOnUiThread {
+                    screensaverEngine.recordInteraction()
+                    audioEngine.playSelectPop()
+                    launchAppSafely(targetApp)
+                }
+                true
+            } else {
+                false
+            }
+        }
+
         remoteServer.onKeyReceived = { keyCode ->
             runOnUiThread {
                 screensaverEngine.recordInteraction()
@@ -247,7 +313,8 @@ class MainActivity : Activity() {
         remoteServer.onTextReceived = { text ->
             runOnUiThread {
                 screensaverEngine.recordInteraction()
-                Toast.makeText(this, "Remote Typed: $text", Toast.LENGTH_SHORT).show()
+                audioEngine.playSelectPop()
+                showSpotlightSearch(text)
             }
         }
 
@@ -262,8 +329,8 @@ class MainActivity : Activity() {
     private fun setupTopShelfActions() {
         topShelfHero.primaryActionBtn.nextFocusDownId = R.id.pillFavorites
         topShelfHero.secondaryActionBtn.nextFocusDownId = R.id.pillFavorites
-        topShelfHero.primaryActionBtn.nextFocusUpId = R.id.btnPhoneRemote
-        topShelfHero.secondaryActionBtn.nextFocusUpId = R.id.btnZenithSettings
+        topShelfHero.primaryActionBtn.nextFocusUpId = R.id.btnSpotlightSearch
+        topShelfHero.secondaryActionBtn.nextFocusUpId = R.id.btnPhoneRemote
 
         topShelfHero.onPlayActionClicked = {
             audioEngine.playSelectPop()
@@ -570,6 +637,13 @@ class MainActivity : Activity() {
                     return true
                 }
             }
+        }
+
+        // Open Zenith Spotlight Search on remote SEARCH key
+        if (keyCode == KeyEvent.KEYCODE_SEARCH) {
+            audioEngine.playSelectPop()
+            showSpotlightSearch("")
+            return true
         }
 
         // Open Zenith Settings on remote MENU key

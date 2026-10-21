@@ -20,7 +20,7 @@
         android:layout_marginTop="20dp"
         android:clipChildren="false" />
 
-    <!-- Top-Right Utility Controls (Phone Remote & Zenith Settings) -->
+    <!-- Top-Right Utility Controls (Spotlight Search, Phone Remote & Zenith Settings) -->
     <LinearLayout
         android:id="@+id/topUtilityBar"
         android:layout_width="wrap_content"
@@ -35,6 +35,22 @@
         android:orientation="horizontal">
 
         <Button
+            android:id="@+id/btnSpotlightSearch"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:layout_marginEnd="8dp"
+            android:layout_marginRight="8dp"
+            android:background="@drawable/bg_category_pill"
+            android:focusable="true"
+            android:nextFocusRight="@+id/btnPhoneRemote"
+            android:nextFocusDown="@+id/btnTopShelfPlay"
+            android:paddingHorizontal="14dp"
+            android:text="🔍 Search"
+            android:textAllCaps="false"
+            android:textColor="@color/tvos_text_primary"
+            android:textSize="12sp" />
+
+        <Button
             android:id="@+id/btnPhoneRemote"
             android:layout_width="wrap_content"
             android:layout_height="32dp"
@@ -42,6 +58,7 @@
             android:layout_marginRight="8dp"
             android:background="@drawable/bg_category_pill"
             android:focusable="true"
+            android:nextFocusLeft="@+id/btnSpotlightSearch"
             android:nextFocusRight="@+id/btnZenithSettings"
             android:nextFocusDown="@+id/btnTopShelfPlay"
             android:paddingHorizontal="14dp"

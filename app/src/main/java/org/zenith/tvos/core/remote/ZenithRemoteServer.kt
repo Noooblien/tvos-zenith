@@ -15,17 +15,26 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Embedded, zero-dependency local Wi-Fi HTTP remote control server.
- * Enables zero-install phone control (iPhone / Android) of Zenith TV.
+ * Enables zero-install phone control (iPhone / Android) of Zenith TV,
+ * including live App Quick-Launch Grid, Spotlight Search text dispatch, and Glass Trackpad.
  */
 class ZenithRemoteServer(
     val port: Int = DEFAULT_PORT
 ) {
+    data class RemoteAppEntry(
+        val packageName: String,
+        val label: String,
+        val category: String
+    )
+
     private var serverSocket: ServerSocket? = null
     private val isRunning = AtomicBoolean(false)
     private val threadPool = Executors.newFixedThreadPool(4)
 
     var onKeyReceived: ((Int) -> Unit)? = null
     var onTextReceived: ((String) -> Unit)? = null
+    var onLaunchPackageRequested: ((String) -> Boolean)? = null
+    var appListProvider: (() -> List<RemoteAppEntry>)? = null
 
     fun start(): Boolean {
         if (isRunning.get()) return true
@@ -110,6 +119,25 @@ class ZenithRemoteServer(
                         val json = "{\"status\":\"ok\",\"app\":\"Zenith TV\",\"ip\":\"${getLocalIpAddress() ?: "unknown"}\"}"
                         sendResponse(output, 200, "OK", "application/json", json)
                     }
+                    path == "/api/apps" -> {
+                        val apps = appListProvider?.invoke() ?: emptyList()
+                        val json = serializeAppsJson(apps)
+                        sendResponse(output, 200, "OK", "application/json", json)
+                    }
+                    path == "/api/launch" -> {
+                        val queryParams = parseQueryParams(queryString)
+                        val pkg = queryParams["pkg"]?.trim() ?: ""
+                        if (pkg.isNotEmpty()) {
+                            val accepted = onLaunchPackageRequested?.invoke(pkg) ?: false
+                            if (accepted) {
+                                sendResponse(output, 200, "OK", "application/json", "{\"status\":\"ok\",\"launched\":\"${escapeJson(pkg)}\"}")
+                            } else {
+                                sendResponse(output, 404, "Not Found", "application/json", "{\"error\":\"package not found: ${escapeJson(pkg)}\"}")
+                            }
+                        } else {
+                            sendResponse(output, 400, "Bad Request", "application/json", "{\"error\":\"missing pkg parameter\"}")
+                        }
+                    }
                     path == "/api/input" -> {
                         val queryParams = parseQueryParams(queryString)
                         val keyName = queryParams["key"]?.uppercase() ?: ""
@@ -130,7 +158,7 @@ class ZenithRemoteServer(
                         }
                         if (!text.isNullOrEmpty()) {
                             onTextReceived?.invoke(text)
-                            sendResponse(output, 200, "OK", "application/json", "{\"status\":\"ok\",\"typed\":\"$text\"}")
+                            sendResponse(output, 200, "OK", "application/json", "{\"status\":\"ok\",\"typed\":\"${escapeJson(text)}\"}")
                         } else {
                             sendResponse(output, 400, "Bad Request", "application/json", "{\"error\":\"missing text parameter\"}")
                         }
@@ -163,6 +191,21 @@ class ZenithRemoteServer(
 
     companion object {
         const val DEFAULT_PORT = 8080
+
+        fun escapeJson(value: String): String {
+            return value
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+        }
+
+        fun serializeAppsJson(apps: List<RemoteAppEntry>): String {
+            val items = apps.joinToString(",") { app ->
+                "{\"pkg\":\"${escapeJson(app.packageName)}\",\"label\":\"${escapeJson(app.label)}\",\"category\":\"${escapeJson(app.category)}\"}"
+            }
+            return "{\"apps\":[$items]}"
+        }
 
         /**
          * Resolves the primary local Wi-Fi IPv4 address.
@@ -204,6 +247,7 @@ class ZenithRemoteServer(
                 "VOLUP", "VOLUME_UP" -> KeyEvent.KEYCODE_VOLUME_UP
                 "VOLDOWN", "VOLUME_DOWN" -> KeyEvent.KEYCODE_VOLUME_DOWN
                 "MENU", "CONTEXT" -> KeyEvent.KEYCODE_MENU
+                "SEARCH", "SPOTLIGHT" -> KeyEvent.KEYCODE_SEARCH
                 else -> null
             }
         }
@@ -230,7 +274,7 @@ class ZenithRemoteServer(
         }
 
         /**
-         * Complete self-contained Apple TV glassmorphic mobile web app.
+         * Complete self-contained Apple TV glassmorphic mobile web app with Quick-Launch App Drawer.
          */
         fun getRemoteHtmlPage(): String {
             return """
@@ -238,73 +282,97 @@ class ZenithRemoteServer(
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#0B0E14">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Zenith TV Remote</title>
     <style>
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; user-select: none; }
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
         body {
-            background-color: #0B0E14;
+            background: radial-gradient(circle at 50% 0%, #1B2436 0%, #090C15 100%);
             color: #F5F5F7;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            min-height: 100vh;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: space-between;
-            height: 100vh;
-            height: 100dvh;
-            padding: env(safe-area-inset-top, 16px) 20px env(safe-area-inset-bottom, 20px);
-            overflow: hidden;
+            padding: 16px 20px 24px;
+            overflow-x: hidden;
         }
         .header {
             width: 100%;
+            max-width: 360px;
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            padding: 8px 4px;
+            justify-content: space-between;
+            padding: 6px 4px;
         }
         .logo-title {
-            font-size: 18px;
+            font-size: 16px;
             font-weight: 700;
-            letter-spacing: 0.5px;
-            color: #F5F5F7;
-        }
-        .status-badge {
-            background: rgba(41, 151, 255, 0.15);
-            border: 1px solid rgba(41, 151, 255, 0.4);
-            border-radius: 999px;
-            padding: 4px 12px;
-            font-size: 12px;
-            font-weight: 600;
-            color: #2997FF;
+            letter-spacing: 0.4px;
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 8px;
         }
-        .status-dot { width: 7px; height: 7px; background: #30D158; border-radius: 50%; box-shadow: 0 0 6px #30D158; }
-        
-        /* Glassmorphic Touch Trackpad */
+        .status-badge {
+            font-size: 11px;
+            color: #30D158;
+            background: rgba(48, 209, 88, 0.14);
+            border: 1px solid rgba(48, 209, 88, 0.35);
+            padding: 4px 10px;
+            border-radius: 999px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .status-dot { width: 6px; height: 6px; background: #30D158; border-radius: 50%; }
+
+        .tab-bar {
+            width: 100%;
+            max-width: 360px;
+            display: flex;
+            background: rgba(255,255,255,0.07);
+            border-radius: 999px;
+            padding: 3px;
+            margin: 8px 0;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 7px 0;
+            border: none;
+            background: transparent;
+            color: #AEAEB2;
+            font-size: 13px;
+            font-weight: 600;
+            border-radius: 999px;
+            cursor: pointer;
+        }
+        .tab-btn.active {
+            background: rgba(255,255,255,0.18);
+            color: #FFFFFF;
+        }
+
+        /* Glass Trackpad Surface */
         .trackpad-container {
             width: 100%;
             max-width: 340px;
-            height: 300px;
-            background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.06) 0%, rgba(20,25,38,0.7) 100%);
-            border: 1.5px solid rgba(255, 255, 255, 0.18);
+            height: 250px;
+            background: linear-gradient(145deg, rgba(255,255,255,0.09) 0%, rgba(255,255,255,0.03) 100%);
+            border: 1.5px solid rgba(255, 255, 255, 0.16);
             border-radius: 36px;
-            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255,255,255,0.15);
             position: relative;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.2);
             display: flex;
             align-items: center;
             justify-content: center;
             touch-action: none;
             transition: border-color 0.15s, transform 0.1s;
+            margin: 6px 0;
         }
         .trackpad-container:active { border-color: rgba(41, 151, 255, 0.6); transform: scale(0.99); }
         .trackpad-center-btn {
-            width: 90px;
-            height: 90px;
+            width: 86px;
+            height: 86px;
             border-radius: 50%;
             background: rgba(255, 255, 255, 0.08);
             border: 1px solid rgba(255, 255, 255, 0.15);
@@ -322,10 +390,42 @@ class ZenithRemoteServer(
             color: rgba(255,255,255,0.35);
             pointer-events: none;
         }
-        .arrow-up { top: 18px; }
-        .arrow-down { bottom: 18px; }
+        .arrow-up { top: 16px; }
+        .arrow-down { bottom: 16px; }
         .arrow-left { left: 20px; }
         .arrow-right { right: 20px; }
+
+        /* Quick Launch App Grid Panel */
+        .apps-panel {
+            display: none;
+            width: 100%;
+            max-width: 340px;
+            height: 250px;
+            overflow-y: auto;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 24px;
+            padding: 12px;
+            margin: 6px 0;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            align-content: start;
+        }
+        .app-chip {
+            background: rgba(255,255,255,0.09);
+            border: 1px solid rgba(255,255,255,0.14);
+            border-radius: 14px;
+            padding: 10px 12px;
+            color: #F5F5F7;
+            font-size: 13px;
+            font-weight: 600;
+            text-align: left;
+            cursor: pointer;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .app-chip:active { background: rgba(41, 151, 255, 0.35); }
 
         /* Tactile Remote Buttons */
         .controls-grid {
@@ -333,27 +433,27 @@ class ZenithRemoteServer(
             max-width: 340px;
             display: flex;
             flex-direction: column;
-            gap: 12px;
-            margin-bottom: 8px;
+            gap: 10px;
+            margin-bottom: 4px;
         }
         .button-row {
             display: flex;
-            gap: 12px;
+            gap: 10px;
             width: 100%;
         }
         .btn-tv {
             flex: 1;
-            height: 52px;
+            height: 48px;
             background: rgba(255, 255, 255, 0.09);
             border: 1px solid rgba(255, 255, 255, 0.14);
-            border-radius: 20px;
+            border-radius: 18px;
             color: #F5F5F7;
-            font-size: 15px;
+            font-size: 14px;
             font-weight: 600;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 8px;
+            gap: 6px;
             cursor: pointer;
             box-shadow: 0 4px 12px rgba(0,0,0,0.3);
             transition: transform 0.08s, background 0.08s;
@@ -411,6 +511,11 @@ class ZenithRemoteServer(
         <div class="status-badge"><div class="status-dot"></div> Connected</div>
     </div>
 
+    <div class="tab-bar">
+        <button class="tab-btn active" id="tabPad" onclick="switchTab('pad')">Touchpad</button>
+        <button class="tab-btn" id="tabApps" onclick="switchTab('apps')">🚀 Quick Apps</button>
+    </div>
+
     <!-- Swipe & Touch Glass Trackpad -->
     <div class="trackpad-container" id="trackpad">
         <span class="dpad-arrow arrow-up">▲</span>
@@ -420,6 +525,9 @@ class ZenithRemoteServer(
         <div class="trackpad-center-btn">OK</div>
     </div>
 
+    <!-- Quick Apps Panel -->
+    <div class="apps-panel" id="appsPanel"></div>
+
     <!-- Controls -->
     <div class="controls-grid">
         <div class="button-row">
@@ -428,8 +536,9 @@ class ZenithRemoteServer(
             <button class="btn-tv" onclick="sendKey('MENU')">☰ Menu</button>
         </div>
         <div class="button-row">
-            <button class="btn-tv btn-primary" onclick="sendKey('PLAY_PAUSE')">⏯ Play / Pause</button>
+            <button class="btn-tv btn-primary" onclick="sendKey('SEARCH')">🔍 Search</button>
             <button class="btn-tv" onclick="openKeyboard()">⌨️ Type</button>
+            <button class="btn-tv" onclick="sendKey('PLAY_PAUSE')">⏯ Play</button>
         </div>
         <div class="button-row">
             <button class="btn-tv" onclick="sendKey('VOLDOWN')">🔉 Vol -</button>
@@ -440,11 +549,11 @@ class ZenithRemoteServer(
     <!-- Keyboard Modal -->
     <div class="modal" id="keyboardModal">
         <div class="modal-box">
-            <h3 style="font-size: 18px;">Type to TV</h3>
-            <input type="text" id="tvInput" class="modal-input" placeholder="Type message or search..." autocomplete="off">
+            <h3 style="font-size: 18px;">Spotlight Type to TV</h3>
+            <input type="text" id="tvInput" class="modal-input" placeholder="Search app name..." autocomplete="off">
             <div style="display: flex; gap: 10px;">
                 <button class="btn-tv" onclick="closeKeyboard()">Cancel</button>
-                <button class="btn-tv btn-primary" onclick="submitText()">Send</button>
+                <button class="btn-tv btn-primary" onclick="submitText()">Search</button>
             </div>
         </div>
     </div>
@@ -459,6 +568,43 @@ class ZenithRemoteServer(
         function sendKey(key) {
             vibrate();
             fetch('/api/input?key=' + encodeURIComponent(key), { cache: 'no-store' }).catch(() => {});
+        }
+
+        function launchApp(pkg) {
+            vibrate();
+            fetch('/api/launch?pkg=' + encodeURIComponent(pkg), { cache: 'no-store' }).catch(() => {});
+        }
+
+        function switchTab(mode) {
+            const pad = document.getElementById('trackpad');
+            const apps = document.getElementById('appsPanel');
+            document.getElementById('tabPad').classList.toggle('active', mode === 'pad');
+            document.getElementById('tabApps').classList.toggle('active', mode === 'apps');
+            if (mode === 'apps') {
+                pad.style.display = 'none';
+                apps.style.display = 'grid';
+                loadApps();
+            } else {
+                pad.style.display = 'flex';
+                apps.style.display = 'none';
+            }
+        }
+
+        function loadApps() {
+            const container = document.getElementById('appsPanel');
+            fetch('/api/apps', { cache: 'no-store' })
+                .then(r => r.json())
+                .then(data => {
+                    container.innerHTML = '';
+                    (data.apps || []).forEach(app => {
+                        const btn = document.createElement('button');
+                        btn.className = 'app-chip';
+                        btn.textContent = '🚀 ' + app.label;
+                        btn.onclick = () => launchApp(app.pkg);
+                        container.appendChild(btn);
+                    });
+                })
+                .catch(() => {});
         }
 
         // Swipe & Tap Detection on Trackpad
