@@ -21,10 +21,22 @@ class FuzzyAppSearchEngineTest {
     )
 
     @Test
-    fun `empty query returns all apps unchanged`() {
+    fun `empty query returns all apps unchanged when no recents or favorites`() {
         val res = engine.search(sampleApps, "   ")
         assertEquals(6, res.size)
         assertEquals("Netflix", res[0].label)
+    }
+
+    @Test
+    fun `empty query prioritizes MRU recent apps and pinned favorites`() {
+        val res = engine.search(
+            apps = sampleApps,
+            rawQuery = "",
+            recentPackages = listOf("com.plexapp.android"),
+            favoritePackages = setOf("com.spotify.tv.android")
+        )
+        assertEquals("Plex", res[0].label)
+        assertEquals("Spotify Music", res[1].label)
     }
 
     @Test
@@ -57,8 +69,30 @@ class FuzzyAppSearchEngineTest {
     }
 
     @Test
-    fun `matches by category name`() {
-        val musicApps = engine.search(sampleApps, "music")
-        assertTrue(musicApps.any { it.label == "Spotify Music" })
+    fun `matches Damerau-Levenshtein typos and adjacent character transpositions`() {
+        // Adjacent transposition: "netlfix" -> "netflix" (distance 1)
+        assertEquals(1, engine.computeDamerauLevenshteinDistance("netlfix", "netflix"))
+        val transposed = engine.search(sampleApps, "netlfix")
+        assertTrue(transposed.isNotEmpty())
+        assertEquals("Netflix", transposed.first().label)
+
+        // Substitution typo on word boundary: "yuotube" -> "youtube" (distance 1)
+        val youtubeTypo = engine.search(sampleApps, "yuotube")
+        assertTrue(youtubeTypo.isNotEmpty())
+        assertEquals("YouTube TV", youtubeTypo.first().label)
+
+        // Distant unrelated strings return > maxDistance
+        assertTrue(engine.computeDamerauLevenshteinDistance("abcdefg", "xyz", maxDistance = 2) > 2)
+    }
+
+    @Test
+    fun `matches by category name and boosts recent apps on tie`() {
+        val streamingApps = engine.search(
+            apps = sampleApps,
+            rawQuery = "streaming",
+            recentPackages = listOf("com.plexapp.android")
+        )
+        assertTrue(streamingApps.isNotEmpty())
+        assertEquals("Plex", streamingApps.first().label)
     }
 }

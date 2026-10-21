@@ -8,6 +8,7 @@ import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.ViewGroup
 import android.view.Window
 import android.widget.Button
@@ -21,8 +22,9 @@ import org.zenith.tvos.core.search.FuzzyAppSearchEngine
 import org.zenith.tvos.ui.dock.AppItem
 
 /**
- * Apple TV Spotlight Quick-Search & Instant Launch Modal.
- * Features a D-pad friendly virtual key bar (A-Z, 0-9, SPACE, ⌫, CLEAR)
+ * Apple TV style Spotlight App Search Overlay.
+ * Supports D-pad on-screen quick-filter keyboard, physical/Bluetooth QWERTY keyboard typing,
+ * typo-tolerant Damerau-Levenshtein matching, MRU/Favorites ranking boost,
  * and live Phone Remote keyboard text injection (`updateExternalQuery`).
  */
 class SpotlightSearchDialog(
@@ -30,6 +32,8 @@ class SpotlightSearchDialog(
     private val allVisibleApps: List<AppItem>,
     private val searchEngine: FuzzyAppSearchEngine,
     private val audioEngine: TactileAudioEngine,
+    private val recentPackages: List<String> = emptyList(),
+    private val favoritePackages: Set<String> = emptySet(),
     private val onLaunchApp: (AppItem) -> Unit
 ) : Dialog(context) {
 
@@ -66,7 +70,7 @@ class SpotlightSearchDialog(
             typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
         }
         val tvSub = TextView(context).apply {
-            text = "Use D-Pad keys below or type directly from your Phone Remote (⌨️ Type)"
+            text = "Use D-Pad keys, Bluetooth QWERTY keyboard, or Phone Remote (⌨️ Type)"
             textSize = 12f
             setTextColor(Color.parseColor("#99EBEBF5"))
             setPadding(0, (2 * d).toInt(), 0, (12 * d).toInt())
@@ -99,7 +103,7 @@ class SpotlightSearchDialog(
             }
         )
 
-        // Compact D-Pad Key Grid (A-Z + Backspace + Clear)
+        // Compact D-Pad Key Grid (A-Z + Space + Backspace + Clear)
         val keyGrid = GridLayout(context).apply {
             columnCount = 10
             rowCount = 3
@@ -176,9 +180,39 @@ class SpotlightSearchDialog(
         firstKeyBtn?.requestFocus()
     }
 
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        when (keyCode) {
+            in KeyEvent.KEYCODE_A..KeyEvent.KEYCODE_Z -> {
+                val c = ('A'.code + (keyCode - KeyEvent.KEYCODE_A)).toChar()
+                audioEngine.playSelectPop()
+                appendChar(c)
+                return true
+            }
+            in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9 -> {
+                val c = ('0'.code + (keyCode - KeyEvent.KEYCODE_0)).toChar()
+                audioEngine.playSelectPop()
+                appendChar(c)
+                return true
+            }
+            KeyEvent.KEYCODE_SPACE -> {
+                audioEngine.playSelectPop()
+                appendChar(' ')
+                return true
+            }
+            KeyEvent.KEYCODE_DEL -> {
+                audioEngine.playSelectPop()
+                backspace()
+                return true
+            }
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
     private fun appendChar(c: Char) {
-        currentQuery += c
-        refreshResults()
+        if (currentQuery.length < 48) {
+            currentQuery += c
+            refreshResults()
+        }
     }
 
     private fun backspace() {
@@ -192,7 +226,7 @@ class SpotlightSearchDialog(
      * Updates query from Phone Remote `/api/type` text submission.
      */
     fun updateExternalQuery(query: String) {
-        currentQuery = query
+        currentQuery = query.take(48)
         if (isShowing) {
             refreshResults()
         }
@@ -202,13 +236,26 @@ class SpotlightSearchDialog(
         val d = context.resources.displayMetrics.density
         tvQueryDisplay.text = if (currentQuery.isEmpty()) "Type app name..." else "$currentQuery▌"
 
-        val matches = searchEngine.search(allVisibleApps, currentQuery)
+        val matches = searchEngine.search(
+            apps = allVisibleApps,
+            rawQuery = currentQuery,
+            recentPackages = recentPackages,
+            favoritePackages = favoritePackages
+        )
         tvResultCount.text = "MATCHING APPLICATIONS (${matches.size})"
 
         resultsContainer.removeAllViews()
         for (app in matches.take(8)) {
+            val isRecent = recentPackages.contains(app.packageName)
+            val isFav = favoritePackages.contains(app.packageName)
+            val badge = when {
+                isRecent && isFav -> "  •  🕒 ★"
+                isRecent -> "  •  🕒 Recent"
+                isFav -> "  •  ★ Pinned"
+                else -> ""
+            }
             val rowBtn = Button(context).apply {
-                text = "🚀  ${app.label}   •   ${app.category.displayName}"
+                text = "🚀  ${app.label}   •   ${app.category.displayName}$badge"
                 textSize = 13.5f
                 isAllCaps = false
                 gravity = Gravity.START or Gravity.CENTER_VERTICAL

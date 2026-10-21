@@ -272,6 +272,8 @@ class MainActivity : Activity() {
             allVisibleApps = libraryManager.getVisibleApps(),
             searchEngine = searchEngine,
             audioEngine = audioEngine,
+            recentPackages = libraryManager.getRecentApps().map { it.packageName },
+            favoritePackages = libraryManager.getFavorites().map { it.packageName }.toSet(),
             onLaunchApp = { app ->
                 launchAppSafely(app)
             }
